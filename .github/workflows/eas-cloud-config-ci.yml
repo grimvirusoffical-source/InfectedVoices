@@ -28,8 +28,15 @@ jobs:
           grep -q 'applicationId "space.infectedvoices.studio"' android/app/build.gradle
           test -f ios/App/App/PrivacyInfo.xcprivacy
           grep -q 'android.permission.RECORD_AUDIO' android/app/src/main/AndroidManifest.xml
+          grep -q 'path = App/App;' ios/App.xcodeproj/project.pbxproj
+          grep -q '../../../node_modules/@capacitor/app' ios/App/CapApp-SPM/Package.swift
+          if grep -q '\\\\' ios/App/CapApp-SPM/Package.swift; then echo 'Windows path separators leaked into Swift package'; exit 1; fi
+          test -f android/capacitor-cordova-android-plugins/cordova.variables.gradle
+          test -f android/app/src/main/assets/capacitor.config.json
+          grep -q 'npm run sync:ios' .eas/build/production-ios-capacitor.yml
+          grep -q 'npm run sync:android' .eas/build/production-android-capacitor.yml
       - name: Validate EAS config files
         run: |
-          npx --yes eas-cli@latest config --platform ios --profile production --json --non-interactive > /tmp/eas-ios.json || true
-          npx --yes eas-cli@latest config --platform android --profile production --json --non-interactive > /tmp/eas-android.json || true
+          npx --yes eas-cli@latest config --platform ios --profile production --json --non-interactive > /tmp/eas-ios.json
+          npx --yes eas-cli@latest config --platform android --profile production --json --non-interactive > /tmp/eas-android.json
           node -e "const fs=require('fs');const e=JSON.parse(fs.readFileSync('eas.json','utf8')); if(e.build.production.ios.scheme!=='App') process.exit(1); if(e.build.production.android.buildType!=='app-bundle') process.exit(1); console.log('EAS profile structure OK')"
