@@ -9,12 +9,14 @@
       "autoIncrement": true,
       "ios": {
         "credentialsSource": "remote",
+        "image": "latest",
         "scheme": "App",
         "buildConfiguration": "Release",
         "config": "production-ios-capacitor.yml"
       },
       "android": {
         "credentialsSource": "remote",
+        "image": "latest",
         "buildType": "app-bundle",
         "config": "production-android-capacitor.yml"
       }
