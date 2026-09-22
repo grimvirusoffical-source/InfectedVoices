@@ -4,6 +4,9 @@ build:
     - eas/checkout
     - eas/install_node_modules
     - eas/resolve_build_config
+    - run:
+        name: Rebuild Capacitor Android project on Linux
+        command: npm run sync:android
     - eas/inject_android_credentials
     - eas/configure_android_version
     - run:
