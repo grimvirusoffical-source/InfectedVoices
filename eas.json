@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 16.18.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "production": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "credentialsSource": "remote",
+        "scheme": "App",
+        "buildConfiguration": "Release",
+        "config": "production-ios-capacitor.yml"
+      },
+      "android": {
+        "credentialsSource": "remote",
+        "buildType": "app-bundle",
+        "config": "production-android-capacitor.yml"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "completed",
+        "applicationId": "space.infectedvoices.studio"
+      },
+      "ios": {}
+    }
+  }
+}
