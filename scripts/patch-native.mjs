@@ -66,7 +66,7 @@ async function patchIOS(){
   await fs.mkdir(path.join(easProjectDir,'xcshareddata','xcschemes'),{recursive:true});
   let easProject=project
     .replace('path = ../debug.xcconfig;','path = debug.xcconfig;')
-    .replace('path = App;\n\t\t\tsourceTree = "<group>";','path = App/App;\n\t\t\tsourceTree = "<group>";')
+    .replace('\t\t\tpath = App;','\t\t\tpath = App/App;')
     .replace(/INFOPLIST_FILE = App\/Info\.plist;/g,'INFOPLIST_FILE = App/App/Info.plist;')
     .replace('relativePath = "CapApp-SPM";','relativePath = "App/CapApp-SPM";');
   await fs.writeFile(path.join(easProjectDir,'project.pbxproj'),easProject);
