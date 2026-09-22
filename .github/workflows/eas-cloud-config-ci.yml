@@ -1,0 +1,35 @@
+name: EAS cloud release config
+
+on:
+  push:
+    branches: ['eas-cloud-release']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts
+      - name: Generate native iOS project
+        run: npm run native:ios
+      - name: Generate native Android project
+        run: npm run native:android
+      - name: Verify native identifiers
+        run: |
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = space.infectedvoices.studio' ios/App/App.xcodeproj/project.pbxproj
+          grep -q 'applicationId "space.infectedvoices.studio"' android/app/build.gradle
+          test -f ios/App/App/PrivacyInfo.xcprivacy
+          grep -q 'android.permission.RECORD_AUDIO' android/app/src/main/AndroidManifest.xml
+      - name: Validate EAS config files
+        run: |
+          npx --yes eas-cli@latest config --platform ios --profile production --json --non-interactive > /tmp/eas-ios.json || true
+          npx --yes eas-cli@latest config --platform android --profile production --json --non-interactive > /tmp/eas-android.json || true
+          node -e "const fs=require('fs');const e=JSON.parse(fs.readFileSync('eas.json','utf8')); if(e.build.production.ios.scheme!=='App') process.exit(1); if(e.build.production.android.buildType!=='app-bundle') process.exit(1); console.log('EAS profile structure OK')"
