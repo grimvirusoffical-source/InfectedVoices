@@ -29,7 +29,9 @@
         "releaseStatus": "completed",
         "applicationId": "space.infectedvoices.studio"
       },
-      "ios": {}
+      "ios": {
+        "ascAppId": "6814856813"
+      }
     }
   }
 }
