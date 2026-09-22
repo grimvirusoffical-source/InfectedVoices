@@ -33,7 +33,27 @@ async function patchIOS(){
       await fs.copyFile(path.join(root,'assets','app-splash.png'),path.join(splashDir,name));
     }
   }catch{}
-  console.log('Patched Apple permissions, URL scheme, privacy manifest and artwork.');
+
+  const projectPath=path.join(root,'ios','App','App.xcodeproj','project.pbxproj');
+  const project=await fs.readFile(projectPath,'utf8');
+  const targetMatch=project.match(/([A-F0-9]{24}) \/\* App \*\/ = \{\s*isa = PBXNativeTarget;/);
+  if(!targetMatch)throw Error('Could not locate the iOS App target for the shared scheme.');
+  const targetId=targetMatch[1];
+  const schemeDir=path.join(root,'ios','App','App.xcodeproj','xcshareddata','xcschemes');
+  await fs.mkdir(schemeDir,{recursive:true});
+  const ref=`<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="${targetId}" BuildableName="App.app" BlueprintName="App" ReferencedContainer="container:App.xcodeproj"></BuildableReference>`;
+  const scheme=`<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="1600" version="1.7">
+<BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries><BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">${ref}</BuildActionEntry></BuildActionEntries></BuildAction>
+<TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"><Testables/></TestAction>
+<LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">${ref}</BuildableProductRunnable></LaunchAction>
+<ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES"><BuildableProductRunnable runnableDebuggingMode="0">${ref}</BuildableProductRunnable></ProfileAction>
+<AnalyzeAction buildConfiguration="Debug"/>
+<ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>
+</Scheme>
+`;
+  await fs.writeFile(path.join(schemeDir,'App.xcscheme'),scheme);
+  console.log('Patched Apple permissions, URL scheme, privacy manifest, shared scheme and artwork.');
 }
 
 function setApplicationAttribute(xml,name,value){
