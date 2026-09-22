@@ -11,4 +11,10 @@ function art(x,y,w,h){const nx=x/w,ny=y/h,cx=.5,cy=.48;let r=10,g=9,b=14;const d
 await fs.mkdir(path.join(root,'assets'),{recursive:true});
 await fs.writeFile(path.join(root,'assets','app-icon.png'),png(1024,1024,art));
 await fs.writeFile(path.join(root,'assets','app-splash.png'),png(2048,2048,(x,y,w,h)=>art(x,y,w,h)));
-console.log('Generated App Store icon and splash artwork.');
+await fs.writeFile(path.join(root,'assets','android-icon-mdpi.png'),png(48,48,art));
+await fs.writeFile(path.join(root,'assets','android-icon-hdpi.png'),png(72,72,art));
+await fs.writeFile(path.join(root,'assets','android-icon-xhdpi.png'),png(96,96,art));
+await fs.writeFile(path.join(root,'assets','android-icon-xxhdpi.png'),png(144,144,art));
+await fs.writeFile(path.join(root,'assets','android-icon-xxxhdpi.png'),png(192,192,art));
+await fs.writeFile(path.join(root,'assets','play-store-icon.png'),png(512,512,art));
+console.log('Generated Apple and Android store artwork.');
