@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Infected Voices",
+    "slug": "infected-voices-core5",
+    "version": "0.6.5",
+    "scheme": "infectedvoices",
+    "ios": {
+      "bundleIdentifier": "space.infectedvoices.studio",
+      "buildNumber": "1",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "space.infectedvoices.studio",
+      "versionCode": 1
+    }
+  }
+}
