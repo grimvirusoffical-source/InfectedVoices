@@ -4,6 +4,9 @@ build:
     - eas/checkout
     - eas/install_node_modules
     - eas/resolve_build_config
+    - run:
+        name: Rebuild Capacitor iOS project on macOS
+        command: npm run sync:ios
     - eas/resolve_apple_team_id_from_credentials:
         id: resolve_apple_team
     - eas/configure_ios_credentials
