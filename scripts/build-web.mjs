@@ -26,8 +26,8 @@ let studio=await fs.readFile(path.join(out,'studio.html'),'utf8');
 studio=studio.replace("<link rel='stylesheet' href='./workstation/studio.css'>","<link rel='stylesheet' href='./workstation/studio.css'>\n  <link rel='stylesheet' href='./mobile.css'>")
  .replace("src='./entry.js'","src='./mobile-entry.js'")
  .replace(/0\.6 COLLAB PILOT/g,'CORE 5 MOBILE')
- .replace(/Continue with Google/g,'Continue to account')
- .replace(/Sign in with Google to view and use Infected Voices\.[^<]*/g,'Sign in to use your Infected Voices account. Authorization opens securely in your browser and returns you to the app.')
+ .replace(/Continue with Google/g,'Sign in with Google or Apple')
+ .replace(/Sign in with Google to view and use Infected Voices\.[^<]*/g,'Sign in with Google or Apple to use your Infected Voices account. Authorization opens securely in your browser and returns you to the app.')
  .replace(/This release is a preview; retain project backups\./g,'Keep portable project backups before major edits or app updates.');
 await fs.writeFile(path.join(out,'studio.html'),studio);
 let lab=await fs.readFile(path.join(out,'lab','index.html'),'utf8');
