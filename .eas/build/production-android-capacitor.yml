@@ -13,5 +13,11 @@ build:
           sudo apt-get install -y openjdk-21-jdk
           java -version
           ls -la /usr/lib/jvm
+    - run:
+        name: Normalize Windows Gradle wrapper
+        command: |
+          sed -i 's/$//' android/gradlew
+          chmod +x android/gradlew
+          head -n 1 android/gradlew
     - eas/run_gradle
     - eas/find_and_upload_build_artifacts
