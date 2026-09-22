@@ -1,24 +1,21 @@
-# iOS feature map
+# Core 5 mobile feature map
 
-| Windows feature | iPhone / iPad build |
-|---|---|
-| Arrangement Studio | Included; touch-first single-column layout on phones, expanded layout on iPad/landscape |
-| Multitrack recording | Included through Web Audio/getUserMedia with iOS microphone permission |
-| Recording journal / recovery | Included; IndexedDB remains app-local |
-| Comping / punch recording | Included |
-| InfectedTune / Precision Tune | Included |
-| Pocket / Precision Pocket | Included |
-| Core 3 mixer / buses / EQ / compression | Included |
-| Shared delay / reverb | Included |
-| Core 5 automation / sidechain | Included |
-| GRIM rack | Included |
-| LUFS / true-peak producer mastering | Included |
-| WAV / stems / project ZIP export | Included through native share sheet; 256 MB per-file mobile safety cap |
-| Classic Studio | Included |
-| MP3 encoder | Included in the local web payload |
-| Existing account / access | Uses the same guarded device-v1 account API; no Stripe checkout or code redemption CTA in the iOS binary |
-| Owner controls | Existing account UI retained where compatible |
-| Host switching | Mobile Settings; HTTPS origin only |
-| Windows self-updater | Replaced by App Store-managed updates |
-| Core 6 collaboration client | Included, but only activates against a compatible Core 6 server |
-| Voice chat | WebRTC/Web Audio path; production TURN is required for restrictive networks |
+| Windows/Core 5 feature | iPhone / iPad | Android |
+|---|---|---|
+| Arrangement Studio | Included; touch-first phone layout and expanded tablet/landscape layout | Included; touch-first phone layout and expanded tablet/landscape layout |
+| Multitrack recording | Included with native microphone permission | Included with native microphone permission |
+| Recording journal / recovery | Included; app-local IndexedDB | Included; app-local IndexedDB |
+| Comping / punch recording | Included | Included |
+| InfectedTune / Precision Tune | Included | Included |
+| Pocket / Precision Pocket | Included | Included |
+| Core 3 mixer / buses / EQ / compression | Included | Included |
+| Shared delay / reverb | Included | Included |
+| Core 5 automation / sidechain | Included | Included |
+| GRIM rack | Included | Included |
+| LUFS / true-peak producer mastering | Included | Included |
+| WAV / stems / project ZIP export | Native share/document flow; 256 MB per-file mobile safety cap | Native share/document flow; 256 MB per-file mobile safety cap |
+| Classic Studio / MP3 encoder | Included | Included |
+| Existing account / access | Guarded device-v1 account API | Guarded device-v1 account API |
+| Host switching | HTTPS-only Mobile Settings | HTTPS-only Mobile Settings |
+| Windows self-updater | Replaced by App Store updates | Replaced by Google Play updates |
+| Unreleased Core 6 collaboration | Not bootstrapped in Core 5 store build | Not bootstrapped in Core 5 store build |
