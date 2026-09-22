@@ -37,6 +37,5 @@ jobs:
           grep -q 'npm run sync:android' .eas/build/production-android-capacitor.yml
       - name: Validate EAS config files
         run: |
-          npx --yes eas-cli@latest config --platform ios --profile production --json --non-interactive > /tmp/eas-ios.json
-          npx --yes eas-cli@latest config --platform android --profile production --json --non-interactive > /tmp/eas-android.json
-          node -e "const fs=require('fs');const e=JSON.parse(fs.readFileSync('eas.json','utf8')); if(e.build.production.ios.scheme!=='App') process.exit(1); if(e.build.production.android.buildType!=='app-bundle') process.exit(1); console.log('EAS profile structure OK')"
+          node -e "const fs=require('fs');const e=JSON.parse(fs.readFileSync('eas.json','utf8')); if(e.build.production.ios.scheme!=='App') process.exit(1); if(e.build.production.android.buildType!=='app-bundle') process.exit(1); if(e.build.production.ios.config!=='production-ios-capacitor.yml') process.exit(1); if(e.build.production.android.config!=='production-android-capacitor.yml') process.exit(1); console.log('EAS profile structure OK')"
+          echo "Account-bound EAS config resolution is tested on the authenticated release machine, not public CI."
