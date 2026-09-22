@@ -1,0 +1,29 @@
+name: Unified Studio source extract
+on:
+  push:
+    branches: ['native/v040-unified-studio']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts
+      - run: npm run build:web
+      - name: Package exact reconstructed source
+        run: |
+          tar -czf InfectedVoices-Core5-Reconstructed-Source.tgz app-source dist mobile-src scripts package.json capacitor.config.json SOURCE-CHECKSUMS.md
+          sha256sum InfectedVoices-Core5-Reconstructed-Source.tgz > Reconstructed-SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: InfectedVoices-Core5-Reconstructed-Source
+          path: |
+            InfectedVoices-Core5-Reconstructed-Source.tgz
+            Reconstructed-SHA256SUMS.txt
+          retention-days: 7
