@@ -27,10 +27,14 @@
       "android": {
         "track": "internal",
         "releaseStatus": "completed",
-        "applicationId": "space.infectedvoices.studio"
+        "applicationId": "space.infectedvoices.studio",
+        "serviceAccountKeyPath": ".secrets/google-play-service-account.json"
       },
       "ios": {
-        "ascAppId": "6814856813"
+        "ascAppId": "6814856813",
+        "ascApiKeyPath": ".secrets/AuthKey_S3527PMRV3.p8",
+        "ascApiKeyId": "S3527PMRV3",
+        "ascApiKeyIssuerId": "af0c0450-10f2-4027-b34d-5356dfc53f5c"
       }
     }
   }
