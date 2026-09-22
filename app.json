@@ -12,6 +12,11 @@
     "android": {
       "package": "space.infectedvoices.studio",
       "versionCode": 1
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0948decd-e7ed-4996-bc7b-3596280a8837"
+      }
     }
   }
 }
