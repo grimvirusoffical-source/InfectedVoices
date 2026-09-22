@@ -53,7 +53,18 @@ async function patchIOS(){
 </Scheme>
 `;
   await fs.writeFile(path.join(schemeDir,'App.xcscheme'),scheme);
-  console.log('Patched Apple permissions, URL scheme, privacy manifest, shared scheme and artwork.');
+
+  const easProjectDir=path.join(root,'ios','App.xcodeproj');
+  await fs.rm(easProjectDir,{recursive:true,force:true});
+  await fs.mkdir(path.join(easProjectDir,'xcshareddata','xcschemes'),{recursive:true});
+  let easProject=project
+    .replace('path = ../debug.xcconfig;','path = debug.xcconfig;')
+    .replace('path = App;\n\t\t\tsourceTree = "<group>";','path = App/App;\n\t\t\tsourceTree = "<group>";')
+    .replace(/INFOPLIST_FILE = App\/Info\.plist;/g,'INFOPLIST_FILE = App/App/Info.plist;')
+    .replace('relativePath = "CapApp-SPM";','relativePath = "App/CapApp-SPM";');
+  await fs.writeFile(path.join(easProjectDir,'project.pbxproj'),easProject);
+  await fs.writeFile(path.join(easProjectDir,'xcshareddata','xcschemes','App.xcscheme'),scheme);
+  console.log('Patched Apple permissions, URL scheme, privacy manifest, shared scheme, EAS project shim and artwork.');
 }
 
 function setApplicationAttribute(xml,name,value){
