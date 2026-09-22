@@ -34,6 +34,13 @@ async function patchIOS(){
     }
   }catch{}
 
+  const swiftPackagePath=path.join(root,'ios','App','CapApp-SPM','Package.swift');
+  try{
+    let swiftPackage=await fs.readFile(swiftPackagePath,'utf8');
+    swiftPackage=swiftPackage.replaceAll('\\\\','/');
+    await fs.writeFile(swiftPackagePath,swiftPackage);
+  }catch{}
+
   const projectPath=path.join(root,'ios','App','App.xcodeproj','project.pbxproj');
   const project=await fs.readFile(projectPath,'utf8');
   const targetMatch=project.match(/([A-F0-9]{24}) \/\* App \*\/ = \{\s*isa = PBXNativeTarget;/);
