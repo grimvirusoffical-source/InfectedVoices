@@ -27,4 +27,29 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npm run native:ios
       - name: Build unsigned simulator app
-        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -configuration Debug -derivedDataPath "$PWD/.derived" CODE_SIGNING_ALLOWED=NO build
+      - name: Verify native app bundle
+        run: |
+          APP="$PWD/.derived/Build/Products/Debug-iphonesimulator/App.app"
+          test -d "$APP"
+          test -f "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$APP/Info.plist"
+          find "$APP" -name PrivacyInfo.xcprivacy -print -quit | grep PrivacyInfo.xcprivacy
+          test -f "$APP/public/studio.html"
+          grep -q 'mobile-entry.js' "$APP/public/studio.html"
+          grep -q 'mobile.css' "$APP/public/studio.html"
+      - name: Package Mac/Xcode handoff
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent ios InfectedVoices-iOS-Xcode-Project.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: InfectedVoices-iOS-Xcode-Project
+          path: |
+            InfectedVoices-iOS-Xcode-Project.zip
+            package-lock.json
+            UPLOAD-APPLE.md
+            STORE-READINESS.md
+            APP-REVIEW-NOTES.md
+            PRIVACY-NOTES.md
+          retention-days: 30
