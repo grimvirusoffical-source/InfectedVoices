@@ -6,5 +6,12 @@ build:
     - eas/resolve_build_config
     - eas/inject_android_credentials
     - eas/configure_android_version
+    - run:
+        name: Install Java 21 toolchain
+        command: |
+          sudo apt-get update -qq
+          sudo apt-get install -y openjdk-21-jdk
+          java -version
+          ls -la /usr/lib/jvm
     - eas/run_gradle
     - eas/find_and_upload_build_artifacts
