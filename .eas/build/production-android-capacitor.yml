@@ -7,17 +7,15 @@ build:
     - eas/inject_android_credentials
     - eas/configure_android_version
     - run:
-        name: Install Java 21 toolchain
+        name: Build signed Android App Bundle with Java 21
         command: |
           sudo apt-get update -qq
           sudo apt-get install -y openjdk-21-jdk
-          java -version
-          ls -la /usr/lib/jvm
-    - run:
-        name: Normalize Windows Gradle wrapper
-        command: |
-          sed -i 's/$//' android/gradlew
+          sed -i 's/\r$//' android/gradlew
           chmod +x android/gradlew
-          head -n 1 android/gradlew
-    - eas/run_gradle
+          export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+          export PATH="$JAVA_HOME/bin:$PATH"
+          java -version
+          cd android
+          ./gradlew :app:bundleRelease
     - eas/find_and_upload_build_artifacts
