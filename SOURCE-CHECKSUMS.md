@@ -1,0 +1,7 @@
+# Infected Voices iOS pinned source
+
+Studio source archive SHA-256:
+
+`e6288c29a180d8d6048fcc9117a6f6a50e7d3225920aadeb2fe48288adaf8967`
+
+The build concatenates `vendor/studio-source.part00.b64` through `part33.b64`, decodes the Base64 archive and refuses to extract it unless this SHA-256 matches.
