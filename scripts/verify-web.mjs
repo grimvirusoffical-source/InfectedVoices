@@ -9,4 +9,6 @@ if(!studio.includes("mobile-entry.js")||!studio.includes('mobile.css'))throw Err
 if(studio.includes("src='./entry.js'"))throw Error('Web collaboration bootstrap leaked into native studio.');
 const shell=await fs.readFile(path.join(dist,'mobile-shell.js'),'utf8');
 for(const marker of ['saveFile','signIn','hostCheck','checkUpdates'])if(!shell.includes(marker))throw Error('Mobile bridge missing '+marker);
-console.log(JSON.stringify({ok:true,files:required.length,studioBytes:(await fs.stat(path.join(dist,'studio.html'))).size,shellBytes:(await fs.stat(path.join(dist,'mobile-shell.js'))).size}));
+const entry=await fs.readFile(path.join(dist,'mobile-entry.js'),'utf8');
+if(entry.includes('Core6Collaboration'))throw Error('Unreleased Core 6 collaboration bootstrap leaked into the Core 5 mobile release.');
+console.log(JSON.stringify({ok:true,core:'5',files:required.length,studioBytes:(await fs.stat(path.join(dist,'studio.html'))).size,shellBytes:(await fs.stat(path.join(dist,'mobile-shell.js'))).size}));
