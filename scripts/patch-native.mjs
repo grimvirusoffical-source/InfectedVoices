@@ -1,0 +1,23 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const platform=process.argv[2];
+if(platform!=='ios')throw Error('This repository currently patches the Apple project only.');
+const plist=path.join(root,'ios','App','App','Info.plist');
+let p=await fs.readFile(plist,'utf8');
+const dictInsert=(key,xml)=>{if(p.includes(`<key>${key}</key>`))return;p=p.replace('</dict>\n</plist>',`\t<key>${key}</key>\n${xml}\n</dict>\n</plist>`);};
+dictInsert('NSMicrophoneUsageDescription','\t<string>Infected Voices needs microphone access only when you choose to record vocals or use collaboration voice chat.</string>');
+dictInsert('ITSAppUsesNonExemptEncryption','\t<false/>');
+dictInsert('LSSupportsOpeningDocumentsInPlace','\t<true/>');
+dictInsert('CFBundleURLTypes','\t<array>\n\t\t<dict>\n\t\t\t<key>CFBundleTypeRole</key><string>Editor</string>\n\t\t\t<key>CFBundleURLSchemes</key><array><string>infectedvoices</string></array>\n\t\t</dict>\n\t</array>');
+await fs.writeFile(plist,p);
+const privacy=path.join(root,'ios','App','App','PrivacyInfo.xcprivacy');
+await fs.writeFile(privacy,`<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>\n<key>NSPrivacyTracking</key><false/>\n<key>NSPrivacyTrackingDomains</key><array/>\n<key>NSPrivacyCollectedDataTypes</key><array>\n<dict><key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeName</string><key>NSPrivacyCollectedDataTypeLinked</key><true/><key>NSPrivacyCollectedDataTypeTracking</key><false/><key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array></dict>\n<dict><key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeEmailAddress</string><key>NSPrivacyCollectedDataTypeLinked</key><true/><key>NSPrivacyCollectedDataTypeTracking</key><false/><key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array></dict>\n<dict><key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeUserID</string><key>NSPrivacyCollectedDataTypeLinked</key><true/><key>NSPrivacyCollectedDataTypeTracking</key><false/><key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array></dict>\n<dict><key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeAudioData</string><key>NSPrivacyCollectedDataTypeLinked</key><true/><key>NSPrivacyCollectedDataTypeTracking</key><false/><key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array></dict>\n</array>\n<key>NSPrivacyAccessedAPITypes</key><array/>\n</dict></plist>\n`);
+const appIconDir=path.join(root,'ios','App','App','Assets.xcassets','AppIcon.appiconset');
+await fs.mkdir(appIconDir,{recursive:true});
+await fs.copyFile(path.join(root,'assets','app-icon.png'),path.join(appIconDir,'AppIcon-512@2x.png'));
+await fs.writeFile(path.join(appIconDir,'Contents.json'),JSON.stringify({images:[{filename:'AppIcon-512@2x.png',idiom:'universal',platform:'ios',size:'1024x1024'}],info:{author:'xcode',version:1}},null,2)+'\n');
+const splashDir=path.join(root,'ios','App','App','Assets.xcassets','Splash.imageset');
+try{await fs.access(splashDir);for(const name of ['splash-2732x2732.png','splash-2732x2732-1.png','splash-2732x2732-2.png'])await fs.copyFile(path.join(root,'assets','app-splash.png'),path.join(splashDir,name));}catch{}
+console.log('Patched Apple permissions, URL scheme, privacy manifest and app icon.');
