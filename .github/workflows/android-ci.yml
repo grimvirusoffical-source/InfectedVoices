@@ -1,0 +1,57 @@
+name: Infected Voices Android
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android 16 SDK
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - run: npm install --ignore-scripts
+      - run: npm run native:android
+      - name: Build native Android project
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew bundleRelease assembleDebug --no-daemon
+      - name: Verify store project
+        run: |
+          grep -q 'android.permission.RECORD_AUDIO' android/app/src/main/AndroidManifest.xml
+          grep -q 'usesCleartextTraffic="false"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:scheme="infectedvoices"' android/app/src/main/AndroidManifest.xml
+          grep -q 'targetSdkVersion = 36' android/variables.gradle
+          test -f android/app/src/main/assets/public/studio.html
+          grep -q 'mobile-entry.js' android/app/src/main/assets/public/studio.html
+          test -f android/app/build/outputs/bundle/release/app-release.aab
+      - name: Package Android Studio handoff
+        run: |
+          zip -rq InfectedVoices-Android-Studio-Project.zip android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: InfectedVoices-Android-Studio-Project
+          path: |
+            InfectedVoices-Android-Studio-Project.zip
+            android/app/build/outputs/bundle/release/app-release.aab
+            assets/play-store-icon.png
+            UPLOAD-ANDROID.md
+            PLAY-STORE-READINESS.md
+            PLAY-DATA-SAFETY.md
+            PRIVACY-NOTES.md
+          retention-days: 30
