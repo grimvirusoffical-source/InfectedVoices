@@ -1,0 +1,30 @@
+{
+  "name": "infected-voices-mobile",
+  "version": "0.6.5-ios.1",
+  "private": true,
+  "description": "Infected Voices native iPhone/iPad app using the Core 5 studio engine with the guarded Core 6 collaboration client",
+  "scripts": {
+    "build:web": "node scripts/build-web.mjs && node scripts/verify-web.mjs",
+    "native:ios": "npm run build:web && node scripts/prepare-native.mjs ios",
+    "sync:ios": "npm run build:web && npx cap sync ios && node scripts/patch-native.mjs ios",
+    "open:ios": "npm run sync:ios && npx cap open ios",
+    "verify:web": "node scripts/verify-web.mjs"
+  },
+  "dependencies": {
+    "@aparajita/capacitor-secure-storage": "8.0.0",
+    "@breezystack/lamejs": "1.2.7",
+    "@capacitor/app": "8.0.0",
+    "@capacitor/browser": "8.0.0",
+    "@capacitor/core": "8.0.0",
+    "@capacitor/filesystem": "8.0.0",
+    "@capacitor/haptics": "8.0.0",
+    "@capacitor/ios": "8.0.0",
+    "@capacitor/network": "8.0.0",
+    "@capacitor/preferences": "8.0.0",
+    "@capacitor/share": "8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.0.0",
+    "esbuild": "0.25.9"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "appId": "space.infectedvoices.studio",
+  "appName": "Infected Voices",
+  "webDir": "dist",
+  "backgroundColor": "#101014",
+  "server": {
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile"
+  }
+}
