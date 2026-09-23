@@ -12,7 +12,8 @@ const labels = {
   web: 'Launch studio'
 };
 const ua = navigator.userAgent || '';
-const id = /Android/i.test(ua) ? 'android' : /iPhone|iPad|iPod/i.test(ua) ? 'ios' : /Windows/i.test(ua) ? 'windows' : 'web';
+let id = /Android/i.test(ua) ? 'android' : /iPhone|iPad|iPod/i.test(ua) ? 'ios' : /Windows/i.test(ua) ? 'windows' : 'web';
+if (/Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad|iPod/i.test(ua)) id = 'web';
 document.querySelector('[data-platform="' + id + '"]')?.setAttribute('data-recommended', 'true');
 const sticky = document.getElementById('stickyGo');
 if (sticky) {

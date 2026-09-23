@@ -53,7 +53,9 @@ elev card · border · radius-lg · padding 24
 | **Android** | Get on Google Play | APK note only if sideload allowed — prefer Play |
 | **Open web** | Launch studio | Works on Chrome / Edge / Safari |
 
-Detect UA lightly: sticky “Recommended for you” badge on matching card (accent-muted). Never hide other platforms.
+Detect UA lightly: sticky “Recommended” badge on the matching card (accent-muted). Never hide other platforms.
+
+**Mac:** no Mac `.app` card and no `native:mac` target. A Mac user-agent highlights **Open web**, and that card launches `/voices/`. Windows, iOS, and Android cards stay as listed above. Do not publish store builds or `InfectedVoices-Windows` Releases until Stress clears this PR.
 
 ---
 

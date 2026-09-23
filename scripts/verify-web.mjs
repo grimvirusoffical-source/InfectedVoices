@@ -69,6 +69,11 @@ if(pkg.scripts['native:mac']||pkg.scripts['native:macos']||pkg.scripts.electron)
 const channels=await fs.readFile(path.join(root,'docs','RELEASE-CHANNELS.md'),'utf8');
 for(const marker of ['InfectedVoices-Windows','EAS','No `InfectedVoices-Mac` repo','not finished','/voices/'])if(!channels.includes(marker))throw Error('Release channels doc is missing '+marker);
 if(!pages['mac.html'].includes('No Mac .app')||!pages['mac.html'].includes('44.1 kHz · 16-bit')||!pages['mac.html'].includes('48 kHz · 24-bit'))throw Error('Mac page is missing Create delivery honesty.');
+const detect=await fs.readFile(path.join(root,'download','get.js'),'utf8');
+if(!detect.includes('Macintosh')||!detect.includes("id = 'web'"))throw Error('Mac UA must highlight Open web.');
+if(/['"]mac['"]/.test(detect)||download.includes('data-platform="mac"'))throw Error('Do not ship a Mac .app card.');
+const spec=await fs.readFile(path.join(root,'docs','UI-download-pages.md'),'utf8');
+if(!spec.includes('Mac user-agent highlights **Open web**')||!spec.includes('no `native:mac`'))throw Error('Download spec dropped the Mac Open web rule.');
 const server=await fs.readFile(path.join(root,'scripts','redx-browser-server.mjs'),'utf8');
 if(!server.includes('pathname==="/get"')||!server.includes('pathname==="/download"'))throw Error('/get is not the same page as /download.');
 if(!server.includes('provider_not_configured')||!server.includes('503'))throw Error('Cloud AI routes must stay real 503s.');
