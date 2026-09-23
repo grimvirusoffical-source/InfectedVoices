@@ -16,6 +16,7 @@
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.0",
     "@breezystack/lamejs": "1.2.7",
+    "@capgo/capacitor-passkey": "8.4.0",
     "@capgo/capacitor-social-login": "8.5.10",
     "@capgo/native-purchases": "8.8.1",
     "@capacitor/app": "8.0.0",
