@@ -67,7 +67,7 @@ if(!browserBuild.includes('build-web.mjs')||!browserBuild.includes('mobile-creat
 const pkg=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
 if(pkg.scripts['native:mac']||pkg.scripts['native:macos']||pkg.scripts.electron)throw Error('Do not invent a Mac Cap target.');
 const channels=await fs.readFile(path.join(root,'docs','RELEASE-CHANNELS.md'),'utf8');
-for(const marker of ['InfectedVoices-Windows','EAS','No `InfectedVoices-Mac` repo','not finished','/voices/'])if(!channels.includes(marker))throw Error('Release channels doc is missing '+marker);
+for(const marker of ['InfectedVoices-Windows','EAS','No `InfectedVoices-Mac` repo','not finished','/voices/','Do not block Core on the split','No forked DSP copies'])if(!channels.includes(marker))throw Error('Release channels doc is missing '+marker);
 if(!pages['mac.html'].includes('No Mac .app')||!pages['mac.html'].includes('44.1 kHz · 16-bit')||!pages['mac.html'].includes('48 kHz · 24-bit'))throw Error('Mac page is missing Create delivery honesty.');
 const detect=await fs.readFile(path.join(root,'download','get.js'),'utf8');
 if(!detect.includes('Macintosh')||!detect.includes("id = 'web'"))throw Error('Mac UA must highlight Open web.');
