@@ -18,4 +18,8 @@ const css=await fs.readFile(path.join(dist,'mobile.css'),'utf8');
 for(const marker of ['#5E6AD2','#6E79D6','safe-area-inset','mobile-tabbar','--iv-accent'])if(!css.includes(marker))throw Error('Mobile stylesheet missing '+marker);
 const font=await fs.stat(path.join(dist,'fonts','InterVariable.woff2')).catch(()=>null);
 if(!font?.isFile()||font.size<1000)throw Error('Inter font missing from mobile web payload.');
+const create=await fs.readFile(path.join(dist,'mobile-create.js'),'utf8');
+for(const marker of ['ivModeCreate','ivModeStudio','Unlock with Pro','Get Pro — $40','Maybe later','Hit REC and spit a take. Headphones help.','Tour complete — open Studio for advanced.','Open advanced settings','Export stems','AI Beat-Lock','Vocal isolation'])if(!create.includes(marker))throw Error('Create flow missing '+marker);
+const {selfCheck}=await import('../mobile-src/entitlements.js');
+selfCheck();
 console.log(JSON.stringify({ok:true,core:'5',files:required.length,studioBytes:(await fs.stat(path.join(dist,'studio.html'))).size,shellBytes:(await fs.stat(path.join(dist,'mobile-shell.js'))).size}));

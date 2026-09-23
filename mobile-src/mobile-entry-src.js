@@ -9,4 +9,6 @@ const {mountMobileChrome}=await import('./mobile-chrome.js');await mountMobileCh
 const {api,auth,openExternal}=await import('./desktop-session.js');
 const {mount}=await import('./workstation/app.js');
 const bridge=await mount({api,auth,openExternal,isDesktop:true});
+window.ivStudioBridge=bridge;
+document.dispatchEvent(new Event('iv-bridge'));
 window.ivPrepareNativeUpdate=()=>bridge.checkpointForNativeUpdate();

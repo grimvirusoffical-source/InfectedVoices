@@ -17,6 +17,8 @@ await fs.copyFile(path.join(src,'classic-runtime.js'),path.join(out,'lab','studi
 await build({entryPoints:{'lab/account-entry':path.join(src,'classic-source','account.js'),'lab/mp3-codec':path.join(src,'classic-source','codec.js')},bundle:true,format:'esm',platform:'browser',outdir:out,target:['safari17','chrome120'],minify:false,legalComments:'eof',define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:{'mobile-shell':path.join(root,'mobile-src','mobile-shell-src.js')},bundle:true,format:'esm',platform:'browser',outdir:out,target:['safari17','chrome120'],minify:false,legalComments:'eof',define:{'process.env.NODE_ENV':'"production"'}});
 await fs.copyFile(path.join(root,'mobile-src','mobile-chrome.js'),path.join(out,'mobile-chrome.js'));
+await fs.copyFile(path.join(root,'mobile-src','mobile-create.js'),path.join(out,'mobile-create.js'));
+await fs.copyFile(path.join(root,'mobile-src','entitlements.js'),path.join(out,'entitlements.js'));
 await fs.copyFile(path.join(root,'mobile-src','mobile.css'),path.join(out,'mobile.css'));
 await fs.cp(path.join(root,'mobile-src','fonts'),path.join(out,'fonts'),{recursive:true});
 const mobileEntry=(await fs.readFile(path.join(root,'mobile-src','mobile-entry-src.js'),'utf8')).replace("import './mobile-shell-src.js';","import './mobile-shell.js';");

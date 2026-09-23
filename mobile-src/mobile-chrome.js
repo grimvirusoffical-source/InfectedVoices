@@ -110,7 +110,9 @@ export async function mountMobileChrome(){
  function syncTabbar(){const on=workspaceReady();bar.hidden=!on;document.body.classList.toggle('iv-tabbar-on',on);}
  const shellNode=document.getElementById('appShell')||document.getElementById('studioShell');
  if(shellNode)new MutationObserver(syncTabbar).observe(shellNode,{attributes:true,attributeFilter:['hidden']});
- syncTabbar();
- window.ivOpenNativeUpdates=showUpdates;
- return {updates:showUpdates,settings:showSettings};
+  syncTabbar();
+  const {mountCreate}=await import('./mobile-create.js');
+  await mountCreate({shell,config});
+  window.ivOpenNativeUpdates=showUpdates;
+  return {updates:showUpdates,settings:showSettings};
 }
