@@ -5,3 +5,6 @@ app-source/
 *.xcuserdata
 DerivedData/
 .secrets/
+
+.vocal-lab/
+.browser-studio/

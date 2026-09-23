@@ -91,6 +91,7 @@ export async function mountMobileChrome(){
    ['Tutorial',go(()=>document.getElementById('tutorial')?.click())],
    ['Saved projects',go(()=>document.getElementById('openSaved')?.click())],
    ['Classic Studio',go(()=>{location.href='lab/index.html';})],
+   ['Vocal Lab',go(()=>{location.href='index.html';})],
    ['Settings',go(showSettings)],
    ['App updates',go(showUpdates)]
   ]:[
@@ -100,6 +101,7 @@ export async function mountMobileChrome(){
    ['Mix',go(()=>scrollTo('.mixbox'))],
    ['Export',go(()=>scrollTo('.panel.export'))],
    ['Arrangement Studio',go(()=>{location.href='../studio.html';})],
+   ['Vocal Lab',go(()=>{location.href='../index.html';})],
    ['Settings',go(showSettings)],
    ['App updates',go(showUpdates)]
   ];
@@ -124,6 +126,10 @@ export async function mountMobileChrome(){
   bar.append(b);
  }
  const scrollTo=sel=>document.querySelector(sel)?.scrollIntoView({behavior:'smooth',block:'start'});
+ if(arrangement){
+  const vocal=E('button','Vocal Lab');vocal.type='button';vocal.id='ivVocalLab';vocal.onclick=()=>{location.href='index.html';};
+  document.querySelector('.top-nav')?.append(vocal);
+ }
  if(arrangement){
   tab('arrange','Arrange',icons.arrange,()=>scrollTo('.arrangement'));
   tab('tracks','Tracks',icons.tracks,()=>scrollTo('.track-library'));

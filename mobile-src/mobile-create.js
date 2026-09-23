@@ -445,6 +445,7 @@ export async function mountCreate({shell, config}) {
       ['Tutorial', () => { moreDialog.close(); setMode('studio'); document.getElementById('tutorial')?.click(); }],
       ['Saved projects', () => { moreDialog.close(); setMode('studio'); document.getElementById('openSaved')?.click(); }],
       [arrangement() ? 'Classic Studio' : 'Arrangement Studio', () => { location.href = arrangement() ? 'lab/index.html' : '../studio.html'; }],
+      ['Vocal Lab', () => { location.href = arrangement() ? 'index.html' : '../index.html'; }],
       ['Subscribe', () => { moreDialog.close(); setMode('create'); showView('subscribe'); }]
     ];
     moreDialog.replaceChildren();

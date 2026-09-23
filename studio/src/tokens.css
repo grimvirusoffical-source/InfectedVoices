@@ -1,0 +1,248 @@
+/**
+ * House Design System — CSS custom properties
+ * Matches /workspace/ui-system/DESIGN.md
+ *
+ * Usage:
+ *   <html data-theme="light"> or data-theme="dark"
+ *   @import "./tokens.css";
+ *   background: var(--bg); color: var(--text-primary);
+ */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Color — light */
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --elevated: #ffffff;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --text-primary: #18181b;
+  --text-secondary: #3f3f46;
+  --text-muted: #71717a;
+  --accent: #5e6ad2;
+  --accent-hover: #4f5bc4;
+  --danger: #dc2626;
+  --success: #16a34a;
+  --warning: #d97706;
+  --on-accent: #ffffff;
+
+  --accent-muted: color-mix(in srgb, var(--accent) 12%, transparent);
+  --danger-muted: color-mix(in srgb, var(--danger) 12%, transparent);
+  --success-muted: color-mix(in srgb, var(--success) 12%, transparent);
+  --warning-muted: color-mix(in srgb, var(--warning) 12%, transparent);
+  --overlay: rgba(9, 9, 11, 0.55);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  --hover-fill: rgba(0, 0, 0, 0.04);
+  --active-fill: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Color — dark */
+  --bg: #09090b;
+  --surface: #111113;
+  --elevated: #18181b;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent: #6e79d6;
+  --accent-hover: #828fff;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --on-accent: #ffffff;
+
+  --accent-muted: color-mix(in srgb, var(--accent) 16%, transparent);
+  --danger-muted: color-mix(in srgb, var(--danger) 16%, transparent);
+  --success-muted: color-mix(in srgb, var(--success) 16%, transparent);
+  --warning-muted: color-mix(in srgb, var(--warning) 16%, transparent);
+  --overlay: rgba(9, 9, 11, 0.72);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--border);
+
+  --hover-fill: rgba(255, 255, 255, 0.06);
+  --active-fill: rgba(255, 255, 255, 0.09);
+}
+
+/* System preference fallback when data-theme is unset */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #09090b;
+    --surface: #111113;
+    --elevated: #18181b;
+    --border: #27272a;
+    --border-strong: #3f3f46;
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+    --accent: #6e79d6;
+    --accent-hover: #828fff;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --on-accent: #ffffff;
+
+    --accent-muted: color-mix(in srgb, var(--accent) 16%, transparent);
+    --danger-muted: color-mix(in srgb, var(--danger) 16%, transparent);
+    --success-muted: color-mix(in srgb, var(--success) 16%, transparent);
+    --warning-muted: color-mix(in srgb, var(--warning) 16%, transparent);
+    --overlay: rgba(9, 9, 11, 0.72);
+    --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--border);
+
+    --hover-fill: rgba(255, 255, 255, 0.06);
+    --active-fill: rgba(255, 255, 255, 0.09);
+  }
+}
+
+:root {
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Geist Mono", Menlo, Consolas, monospace;
+
+  --text-display-size: 32px;
+  --text-display-weight: 600;
+  --text-display-leading: 1.2;
+  --text-display-tracking: -0.025em;
+
+  --text-h1-size: 24px;
+  --text-h1-weight: 600;
+  --text-h1-leading: 1.25;
+  --text-h1-tracking: -0.02em;
+
+  --text-h2-size: 18px;
+  --text-h2-weight: 600;
+  --text-h2-leading: 1.3;
+  --text-h2-tracking: -0.015em;
+
+  --text-body-size: 14px;
+  --text-body-weight: 400;
+  --text-body-leading: 1.5;
+  --text-body-tracking: -0.011em;
+
+  --text-caption-size: 12px;
+  --text-caption-weight: 400;
+  --text-caption-leading: 1.4;
+  --text-caption-tracking: 0;
+
+  --text-label-size: 13px;
+  --text-label-weight: 500;
+  --text-label-leading: 1.4;
+  --text-label-tracking: -0.006em;
+
+  /* Spacing — 4px base */
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* Borders */
+  --border-width: 1px;
+
+  /* Control sizes */
+  --control-height: 32px;
+  --control-height-sm: 28px;
+  --control-height-lg: 36px;
+  --row-height: 40px;
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 56px;
+  --topbar-height: 52px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 100ms;
+  --duration-normal: 150ms;
+
+  /* Breakpoints (for reference in JS / media queries) */
+  --bp-sm: 640px;
+  --bp-md: 1024px;
+}
+
+/* Optional base element defaults — safe to omit if using a CSS reset */
+.ds-root {
+  font-family: var(--font-sans);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-leading);
+  letter-spacing: var(--text-body-tracking);
+  color: var(--text-primary);
+  background-color: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ds-display {
+  font-size: var(--text-display-size);
+  font-weight: var(--text-display-weight);
+  line-height: var(--text-display-leading);
+  letter-spacing: var(--text-display-tracking);
+}
+
+.ds-h1 {
+  font-size: var(--text-h1-size);
+  font-weight: var(--text-h1-weight);
+  line-height: var(--text-h1-leading);
+  letter-spacing: var(--text-h1-tracking);
+}
+
+.ds-h2 {
+  font-size: var(--text-h2-size);
+  font-weight: var(--text-h2-weight);
+  line-height: var(--text-h2-leading);
+  letter-spacing: var(--text-h2-tracking);
+}
+
+.ds-body {
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-leading);
+  letter-spacing: var(--text-body-tracking);
+}
+
+.ds-caption {
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-leading);
+  letter-spacing: var(--text-caption-tracking);
+  color: var(--text-muted);
+}
+
+.ds-label {
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-leading);
+  letter-spacing: var(--text-label-tracking);
+}

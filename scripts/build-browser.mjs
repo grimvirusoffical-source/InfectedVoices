@@ -48,21 +48,6 @@ await build({
   minify:false,legalComments:'eof',plugins:[browserPlugin],define:{'process.env.NODE_ENV':'"production"'}
 });
 
-let index=await fs.readFile(path.join(out,'index.html'),'utf8');
-index=`<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#101014"><title>Infected Voices · Vocal Production Studio</title>
-<link rel="stylesheet" href="./collaboration.css"></head>
-<body class="pilot-home"><main>
-<p class="eyebrow">INFECTED VOICES · CORE 5</p>
-<h1>Your voice.<br>Your <em>studio.</em></h1>
-<p>Record, arrange, tune, pocket, mix and master vocals in the browser. Accounts and access are secured by InfectedNation on RedXAIHost.</p>
-<a class="primary entry-link" href="./studio.html">Open Arrangement Studio →</a>
-<p class="fine">Projects and recordings stay on this device unless you explicitly use a cloud or collaboration feature.</p>
-<p><a href="https://nation.infectedvoices.space/" rel="noopener">Account / sign in ↗</a></p>
-</main></body></html>`;
-await fs.writeFile(path.join(out,'index.html'),index);
-
 let studio=await fs.readFile(path.join(out,'studio.html'),'utf8');
 studio=studio
   .replace("<meta name='robots' content='noindex,nofollow'>",'')
@@ -91,7 +76,22 @@ lab=lab.replace(/<script>if\('serviceWorker'[\s\S]*?<\/script>/g,'');
 await fs.writeFile(labPath,lab);
 await fs.rm(path.join(out,'sw.js'),{force:true});
 
-for(const required of ['index.html','studio.html','api.js','workstation/app.js','lab/index.html','lab/account-entry.js']){
+const studioDir=path.join(root,'studio');
+const studioOut=path.join(root,'.browser-studio');
+const npmBin=process.platform==='win32'?'npm.cmd':'npm';
+execFileSync(npmBin,['install','--include=dev','--ignore-scripts','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+execFileSync(npmBin,['run','build:host','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+await fs.copyFile(path.join(studioOut,'index.html'),path.join(out,'index.html'));
+await fs.cp(path.join(studioOut,'assets'),path.join(out,'assets'),{recursive:true});
+for(const file of ['favicon.svg','bungee-processor-bundled.js','audio-processor.worker.bundle.js','manifest.webmanifest']){
+  await fs.copyFile(path.join(studioOut,file),path.join(out,file));
+}
+const apiText=await fs.readFile(path.join(out,'api.js'),'utf8');
+if(!apiText.includes('infectednation_session'))throw Error('Browser account adapter was overwritten.');
+const indexText=await fs.readFile(path.join(out,'index.html'),'utf8');
+if(!indexText.includes('content="0.7.0"'))throw Error('Canonical studio was not copied into browser-dist.');
+
+for(const required of ['index.html','studio.html','api.js','workstation/app.js','lab/index.html','lab/account-entry.js','favicon.svg','manifest.webmanifest']){
   await fs.access(path.join(out,required));
 }
 console.log('Prepared Infected Voices browser payload in browser-dist/');

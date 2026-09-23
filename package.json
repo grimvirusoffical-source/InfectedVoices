@@ -1,8 +1,8 @@
 {
   "name": "infected-voices-mobile",
-  "version": "0.6.6-mobile.1",
+  "version": "0.7.0",
   "private": true,
-  "description": "Infected Voices Core 5 native mobile studio for iPhone, iPad and Android",
+  "description": "Infected Voices Studio for Capacitor mobile, RedX browser hosting, and Windows",
   "scripts": {
     "build:web": "node scripts/build-web.mjs && node scripts/verify-web.mjs",
     "native:ios": "npm run build:web && node scripts/prepare-native.mjs ios",
@@ -13,7 +13,8 @@
     "sync:android": "npm run build:web && npx cap sync android && node scripts/patch-native.mjs android",
     "open:android": "npm run sync:android && npx cap open android",
     "build:browser": "node scripts/build-browser.mjs",
-    "start:redx": "bun scripts/redx-browser-server.mjs"
+    "start:redx": "bun scripts/redx-browser-server.mjs",
+    "test": "node --experimental-strip-types --test studio/src/lib/studioFeatures.test.ts"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.0",
@@ -35,5 +36,11 @@
   "devDependencies": {
     "@capacitor/cli": "8.0.0",
     "esbuild": "0.25.9"
+  },
+  "redx": {
+    "install_command": "npm install --include=dev --ignore-scripts",
+    "build_command": "npm run build:browser",
+    "start_command": "npm run start:redx",
+    "port": 8791
   }
 }

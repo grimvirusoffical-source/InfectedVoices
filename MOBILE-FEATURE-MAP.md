@@ -18,7 +18,9 @@
 | Existing account / access | Guarded device-v1 account API | Guarded device-v1 account API |
 | Host switching | HTTPS-only Mobile Settings | HTTPS-only Mobile Settings |
 | Windows self-updater | Replaced by App Store updates | Replaced by Google Play updates |
-| Unreleased Core 6 collaboration | Not bootstrapped in Core 5 store build | Not bootstrapped in Core 5 store build |
+| Unreleased Core 6 collaboration | Not bootstrapped. Cap opens Vocal Lab, not the collaboration pilot | Not bootstrapped. Cap opens Vocal Lab, not the collaboration pilot |
+| Vocal Lab 0.7.0 (bar loop, Pocket Assist, Mic Master, Grim Beats, WAV/MP3) | Included as the Cap home page. Exports use native share and the 256 MB cap | Included as the Cap home page. Exports use native share and the 256 MB cap |
+| Arrangement / Classic Core 5 | Included from Vocal Lab → Arrangement Studio and Classic Studio | Included from Vocal Lab → Arrangement Studio and Classic Studio |
 
 ## Intentional deltas
 

@@ -3,7 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dist=path.join(root,'dist');
-const required=['studio.html','mobile-entry.js','mobile-shell.js','mobile.css','workstation/app.js','workstation/producer-ui.js','workstation/precision-ui.js','workstation/mixer-ui.js','lab/index.html','lab/mobile-classic.js','lab/studio-runtime.js','lab/mp3-codec.js'];
+const required=['studio.html','index.html','mobile-entry.js','mobile-shell.js','mobile.css','vocal-bridge.js','bungee-processor-bundled.js','workstation/app.js','workstation/producer-ui.js','workstation/precision-ui.js','workstation/mixer-ui.js','lab/index.html','lab/mobile-classic.js','lab/studio-runtime.js','lab/mp3-codec.js'];
 for(const rel of required){const p=path.join(dist,rel);const st=await fs.stat(p).catch(()=>null);if(!st?.isFile()||st.size<20)throw Error('Missing native web payload: '+rel);}
 const studio=await fs.readFile(path.join(dist,'studio.html'),'utf8');
 if(!studio.includes("mobile-entry.js")||!studio.includes('mobile.css'))throw Error('Studio is not using mobile entry/CSS.');
@@ -13,7 +13,10 @@ for(const marker of ['saveFile','signIn','hostCheck','checkUpdates'])if(!shell.i
 const entry=await fs.readFile(path.join(dist,'mobile-entry.js'),'utf8');
 if(entry.includes('Core6Collaboration'))throw Error('Unreleased Core 6 collaboration bootstrap leaked into the Core 5 mobile release.');
 const chrome=await fs.readFile(path.join(dist,'mobile-chrome.js'),'utf8');
-for(const marker of ['mobileHostSettings','mobileUpdates','device-v1','hostCheck','checkUpdates','installUpdate','core3Mixer','core5Producer','Open store listing','Check server','Search features','GRIM rack','Precision Tune'])if(!chrome.includes(marker))throw Error('Mobile chrome missing '+marker);
+for(const marker of ['mobileHostSettings','mobileUpdates','device-v1','hostCheck','checkUpdates','installUpdate','core3Mixer','core5Producer','Open store listing','Check server','Search features','GRIM rack','Precision Tune','Vocal Lab'])if(!chrome.includes(marker))throw Error('Mobile chrome missing '+marker);
+const home=await fs.readFile(path.join(dist,'index.html'),'utf8');
+if(!home.includes('content="0.7.0"')||!home.includes('vocal-bridge.js'))throw Error('Cap home is not Vocal Lab 0.7.0.');
+if(home.includes('Two voices'))throw Error('Core 6 collaboration pilot is still the Cap launch page.');
 const css=await fs.readFile(path.join(dist,'mobile.css'),'utf8');
 for(const marker of ['#09090B','#6E79D6','#27272A','--surface','--touch','--accent-muted','safe-area-inset','mobile-tabbar','--iv-accent'])if(!css.includes(marker))throw Error('Mobile stylesheet missing '+marker);
 const font=await fs.stat(path.join(dist,'fonts','InterVariable.woff2')).catch(()=>null);

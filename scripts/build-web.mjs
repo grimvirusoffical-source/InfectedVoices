@@ -43,4 +43,15 @@ await fs.writeFile(path.join(out,'lab','index.html'),lab);
 await fs.rm(path.join(out,'sw.js'),{force:true});
 await fs.rm(path.join(out,'manifest.webmanifest'),{force:true});
 for(const html of ['studio.html','lab/index.html']){const p=path.join(out,html),t=await fs.readFile(p,'utf8');if(/serviceWorker\.register|src=['"]\.\/?entry\.js/.test(t))throw Error('Native build still contains a web bootstrap/update path: '+html);}
+const studioDir=path.join(root,'studio');
+const vocalOut=path.join(root,'.vocal-lab');
+const npmBin=process.platform==='win32'?'npm.cmd':'npm';
+execFileSync(npmBin,['install','--include=dev','--ignore-scripts','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+execFileSync(npmBin,['run','build:cap','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+await fs.cp(vocalOut,out,{recursive:true});
+await fs.copyFile(path.join(root,'mobile-src','vocal-bridge.js'),path.join(out,'vocal-bridge.js'));
+let vocalIndex=await fs.readFile(path.join(out,'index.html'),'utf8');
+if(!vocalIndex.includes('content="0.7.0"'))throw Error('Vocal Lab build did not replace the Cap home page.');
+if(!vocalIndex.includes('vocal-bridge.js'))vocalIndex=vocalIndex.replace('</body>','  <script type="module" src="./vocal-bridge.js"></script>\n</body>');
+await fs.writeFile(path.join(out,'index.html'),vocalIndex);
 console.log('Prepared Infected Voices Core 5 mobile web payload in dist/');
