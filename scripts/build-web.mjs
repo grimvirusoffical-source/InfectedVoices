@@ -18,6 +18,7 @@ await build({entryPoints:{'lab/account-entry':path.join(src,'classic-source','ac
 await build({entryPoints:{'mobile-shell':path.join(root,'mobile-src','mobile-shell-src.js')},bundle:true,format:'esm',platform:'browser',outdir:out,target:['safari17','chrome120'],minify:false,legalComments:'eof',define:{'process.env.NODE_ENV':'"production"'}});
 await fs.copyFile(path.join(root,'mobile-src','mobile-chrome.js'),path.join(out,'mobile-chrome.js'));
 await fs.copyFile(path.join(root,'mobile-src','mobile.css'),path.join(out,'mobile.css'));
+await fs.cp(path.join(root,'mobile-src','fonts'),path.join(out,'fonts'),{recursive:true});
 const mobileEntry=(await fs.readFile(path.join(root,'mobile-src','mobile-entry-src.js'),'utf8')).replace("import './mobile-shell-src.js';","import './mobile-shell.js';");
 await fs.writeFile(path.join(out,'mobile-entry.js'),mobileEntry);
 const mobileClassic=(await fs.readFile(path.join(root,'mobile-src','mobile-classic-src.js'),'utf8')).replace("import './mobile-shell-src.js';","import '../mobile-shell.js';");
@@ -25,13 +26,14 @@ await fs.writeFile(path.join(out,'lab','mobile-classic.js'),mobileClassic);
 let studio=await fs.readFile(path.join(out,'studio.html'),'utf8');
 studio=studio.replace("<link rel='stylesheet' href='./workstation/studio.css'>","<link rel='stylesheet' href='./workstation/studio.css'>\n  <link rel='stylesheet' href='./mobile.css'>")
  .replace("src='./entry.js'","src='./mobile-entry.js'")
+ .replace("content='#101014'","content='#09090b'")
  .replace(/0\.6 COLLAB PILOT/g,'CORE 5 MOBILE')
  .replace(/Continue with Google/g,'Continue to account')
  .replace(/Sign in with Google to view and use Infected Voices\.[^<]*/g,'Sign in to use your Infected Voices account. Authorization opens securely in your browser and returns you to the app.')
  .replace(/This release is a preview; retain project backups\./g,'Keep portable project backups before major edits or app updates.');
 await fs.writeFile(path.join(out,'studio.html'),studio);
 let lab=await fs.readFile(path.join(out,'lab','index.html'),'utf8');
-lab=lab.replace('</head>','  <link rel="stylesheet" href="../mobile.css">\n</head>')
+lab=lab.replace('content="#100d17"','content="#09090b"').replace('</head>','  <link rel="stylesheet" href="../mobile.css">\n</head>')
  .replace(/<script type="module" src="\.\/account-entry\.js"><\/script>/,'<script type="module" src="./mobile-classic.js"></script>')
  .replace(/<script>if\('serviceWorker'[\s\S]*?<\/script>/g,'')
  .replace(/On iPhone, iPad or Android,[\s\S]*?loads updates when reopened\./,'This is the native mobile build. Projects and recordings remain local unless you explicitly export them. App updates are distributed through your platform app store.');

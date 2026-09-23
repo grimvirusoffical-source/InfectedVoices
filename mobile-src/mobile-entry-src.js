@@ -1,4 +1,7 @@
 import './mobile-shell-src.js';
+document.documentElement.classList.add('iv-mobile');
+const theme=document.querySelector('meta[name="theme-color"]');
+if(theme)theme.setAttribute('content','#09090b');
 const config=await window.ivShell.config();
 window.ivNative={serverOrigin:config.serverOrigin,openExternal:window.ivShell.openExternal,onLink:window.ivShell.onLink,initialLink:window.ivShell.initialLink,shareInvite:window.ivShell.shareInvite,saveFile:async(name,blob)=>window.ivShell.saveFile(name,await blob.arrayBuffer())};
 window.ivDesktop={onMenu:window.ivShell.onMenu,setSessionState:window.ivShell.setSessionState,checkUpdates:window.ivShell.checkUpdates,checkForUpdates:async()=>{await window.ivOpenNativeUpdates();return {message:'Mobile store update dialog opened.'};}};
