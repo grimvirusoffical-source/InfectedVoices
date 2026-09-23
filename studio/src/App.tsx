@@ -631,7 +631,7 @@ export default function App() {
         <p className="eyebrow">Vocal Lab channel v0.4.1 · Studio {STUDIO_VERSION}</p>
         <h1>Sign in to open Studio.</h1>
         <p>
-          The recording workspace stays behind the existing account sign-in. A signed-in account is Free until Basic, Pro, or a 7-day trial. The GitHub source zipball is not the Windows installer.
+          The recording workspace stays behind the existing account sign-in. A signed-in account is Free until Basic or Pro. The GitHub source zipball is not the Windows installer.
         </p>
         {hostError && <p className="error">{hostError}</p>}
         <div className="cta-row">
