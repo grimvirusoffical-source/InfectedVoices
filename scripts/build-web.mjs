@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import {patchProducerDelivery} from './patch-producer-delivery.mjs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {build} from 'esbuild';
@@ -59,4 +60,5 @@ await fs.mkdir(path.join(out,'get'),{recursive:true});
 await fs.mkdir(path.join(out,'download'),{recursive:true});
 await fs.copyFile(downloadPage,path.join(out,'get','index.html'));
 await fs.copyFile(downloadPage,path.join(out,'download','index.html'));
+await patchProducerDelivery(path.join(out,'workstation','app.js'));
 console.log('Prepared Infected Voices Core 5 mobile web payload in dist/');

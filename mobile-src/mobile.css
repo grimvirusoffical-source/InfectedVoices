@@ -148,7 +148,9 @@ body.native .brand small:before,body.native .brand small::before{content:none}
 }
 .record.active{background:var(--danger)!important;color:var(--on-accent)!important;border-color:var(--danger)!important}
 .transport-buttons button{min-width:44px}
-.clock,.clock strong,.iv-clock{font-variant-numeric:tabular-nums}
+.clock,.clock strong,.iv-clock,.iv-meters{font-variant-numeric:tabular-nums}
+.iv-meters{position:sticky;bottom:0;z-index:30;display:flex;flex-wrap:wrap;gap:8px 16px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:#111113;border-top:1px solid #27272A;color:#A1A1AA;font-size:12px}
+.iv-meters span{min-height:32px;display:inline-flex;align-items:center}
 .clock strong{letter-spacing:-.04em}
 .meter{background:#27272a;height:6px;border-radius:999px}
 .meter i,#meterFill{background:var(--lime)}

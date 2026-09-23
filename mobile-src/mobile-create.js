@@ -1,14 +1,14 @@
 import {PRO_FEATURES, BASIC_FEATURES, BASIC_PLUS, canUse, entitlementKey, featureById, lockBody, resolveTier, setDemoPlan} from './entitlements.js';
 
 const COACH = [
-  {id:'record', view:'record', title:'Record', body:'Hit REC and spit a take. Headphones help.', cta:'Record a take', run:'recordTake'},
-  {id:'loop', view:'record', title:'Loop', body:'Loop a bar range, then record. Loop+Rec stays on while both are running.', cta:'Arm the loop', run:'armLoop'},
-  {id:'tune', view:'tune', title:'Tune', body:'Snap pitch to the key. Start with Auto-Tune — go deeper anytime.', cta:'Auto-tune take', run:'autoTune'},
-  {id:'pocket', view:'tune', title:'Pocket', body:'Assist stays inside ±80 ms. Precision Pocket is on Basic.', cta:'Open Pocket', run:'openPocket'},
-  {id:'mix', view:'mix', title:'Mix', body:'One tap balances levels and loudness. Open Mixer to tweak.', cta:'One-click mix', run:'smartMix'},
-  {id:'lab', view:'mix', title:'Project Lab', body:'Stem gain, offset, and the take vault are on Basic.', cta:'Open Project Lab', feature:'project-lab'},
-  {id:'producer', view:'mix', title:'Producer', body:'GRIM, Precision, and Core 5 Producer are on Basic.', cta:'Open Producer', feature:'core5'},
-  {id:'export', view:'export', title:'Export', body:'Bounce WAV or MP3. Free export is 16-bit. Stems need Pro.', cta:'Export WAV', run:'exportWav'}
+  {id:'prepare', view:'home', title:'Prepare', body:'Import a beat to set the grid and BPM. Lead, beat, and bus stay available in Studio.', cta:'Import a beat', run:'prepareSong'},
+  {id:'record', view:'record', title:'Record', body:'Record a verse with count-in. Aim lead peaks around −12 to −6 dBFS. Headphones help.', cta:'Record a verse', run:'recordTake'},
+  {id:'comp', view:'record', title:'Comp', body:'Pick the best take. Clip gain, fades, and take lanes stay open in Studio.', cta:'Open takes', run:'openComp'},
+  {id:'tune', view:'tune', title:'Tune', body:'Local InfectedTune uses medium correction. Precision Tune — Included in Basic $20.', cta:'Preview tune', run:'autoTune'},
+  {id:'timing', view:'tune', title:'Timing', body:'Conservative pocket stays inside ±80 ms. Preview, then Keep. Precision Pocket — Included in Basic $20.', cta:'Preview timing', run:'lockBeat'},
+  {id:'mix', view:'mix', title:'Mix', body:'Balance vocal and beat gain before effects. The mixer, GRIM, and sidechain stay in Studio.', cta:'Balance to beat', run:'balanceToBeat'},
+  {id:'master', view:'mix', title:'Master', body:'Free keeps a gentle bus. Core 5 integrated LUFS and true peak — Included in Basic $20. The ceiling starts at −1.0 dBTP.', cta:'Open master', run:'openMaster'},
+  {id:'export', view:'export', title:'Export', body:'The delivery note prints integrated LUFS, true peak, sample rate, bit depth, and BPM. Free export is 16-bit. Stems — Included in Pro $40.', cta:'Export song', run:'exportWav'}
 ];
 const CHECKS = [
   {id:'record', label:'Record'},
@@ -33,6 +33,7 @@ const GUARDS = {
   'Save portable project':'portable_project',
   'Open Precision Tune editor':'precision_tune',
   'Open Precision Pocket editor':'precision_pocket',
+  'Open Producer tools · mastering':'core5_master',
   'Open stem separation':'isolate',
   'Open parameter assistant':'ai-mix'
 };
@@ -224,13 +225,31 @@ export async function mountCreate({shell, config}) {
     if (/fail|error|could not|not active|select a vocal|sign in|finish the current/i.test(text)) throw Error(text);
   }
 
+  async function prepareSong() {
+    setMode('studio');
+    const choose = document.getElementById('audioFiles');
+    if (choose) choose.click();
+    else clickNamed('Import audio');
+    toastMessage('Import a beat to set the grid and BPM. Studio tracks stay available.', () => openAdvanced('beat'));
+  }
+  async function openComp() {
+    setMode('studio');
+    toastMessage('Comp in Studio. Clip gain, fades, and take lanes stay open. Create does not remove them.', () => openAdvanced('beat'));
+  }
   async function autoTune() {
     if (arrangement()) {
       selectVocal();
       await setEngine('tuneEngine', 'infected');
       clickStage(4);
       await sleep(30);
-      if (!clickNamed('Clean rap', document.getElementById('inspectorBody') || document)) throw Error('Select a vocal track, then Auto-Tune can apply the Natural preset.');
+    } else if (!document.querySelector('#presets button')) {
+      throw Error('Open a vocal preset in Classic Studio, then try Auto-Tune again.');
+    }
+    toastMessage('Tune preview is ready. Medium correction, not a hard retune. Listen, then Keep.', () => openAdvanced('tune'), keepTune);
+  }
+  async function keepTune() {
+    if (arrangement()) {
+      if (!clickNamed('Clean rap', document.getElementById('inspectorBody') || document)) throw Error('Select a vocal track, then Keep can apply the medium preset.');
       await waitIdle();
       const retune = document.querySelector('#inspectorBody input[aria-label="Retune / ms"]');
       if (retune) {
@@ -240,13 +259,13 @@ export async function mountCreate({shell, config}) {
       }
     } else {
       const preset = [...document.querySelectorAll('#presets button')].find(button => /clean|natural|rap/i.test(button.textContent));
-      if (!preset) throw Error('Open a vocal preset in Classic Studio, then try Auto-Tune again.');
+      if (!preset) throw Error('Open a vocal preset in Classic Studio, then Keep can apply it.');
       preset.click();
       await waitIdle();
     }
     checks.tune = true;
     saveChecks();
-    toastMessage('Auto-Tune applied.', () => openAdvanced('tune'));
+    toastMessage('Tune kept. Undo restores the previous settings.', () => openAdvanced('tune'));
     render();
   }
   async function lockBeat() {
@@ -303,7 +322,7 @@ export async function mountCreate({shell, config}) {
       assertStatus();
       clickStage(6);
       await sleep(30);
-      if (!clickNamed('Rap', document.getElementById('inspectorBody') || document)) throw Error('Master preset is not open.');
+      if (!clickNamed('Balanced', document.getElementById('inspectorBody') || document)) throw Error('Master preset is not open.');
       await waitIdle();
     } else {
       const master = document.getElementById('master');
@@ -313,7 +332,7 @@ export async function mountCreate({shell, config}) {
     }
     checks.mix = true;
     saveChecks();
-    toastMessage('Smart Mix + Master applied.', () => openAdvanced('mix'));
+    toastMessage('Smart Mix + Master previewed the Balanced bus at a −1 dB ceiling. Undo restores the previous master.', () => openAdvanced('mix'));
     render();
   }
   async function exportWav() {
@@ -333,7 +352,8 @@ export async function mountCreate({shell, config}) {
     }
     checks.export = true;
     saveChecks();
-    toastMessage('Export started.', () => openAdvanced('export'));
+    const bitsLabel = bits === 24 ? '24-bit' : '16-bit';
+    toastMessage('Export started. Delivery note: integrated LUFS, true peak, sample rate, ' + bitsLabel + ', and BPM print on the master status. No figure is invented before the bounce.', () => openAdvanced('export'));
     render();
   }
   function exportMp3() {
@@ -389,7 +409,29 @@ export async function mountCreate({shell, config}) {
     rec.click();
   }
   function openPocket() { openAdvanced('beat'); }
-  const runners = {autoTune, lockBeat, smartMix, exportWav, exportStems, recordTake, armLoop, openPocket};
+  async function balanceToBeat() {
+    if (arrangement()) {
+      clickStage(5);
+      await sleep(30);
+      if (!clickNamed('Analyze starting balance')) throw Error('Import a beat, then Balance to beat can set starting gain.');
+      await waitIdle();
+      assertStatus();
+    }
+    checks.mix = true;
+    saveChecks();
+    toastMessage('Starting gains set from the measured tracks. This is gain staging, not an AI master. Mixer controls stay in Studio.', () => openAdvanced('mixer'));
+    render();
+  }
+  async function openMaster() {
+    if (arrangement()) clickStage(6);
+    else openAdvanced('master');
+    if (allowed('core5_master')) {
+      toastMessage('Master stage is open. Ceiling starts at −1.0 dBTP. Core 5 prints integrated LUFS and true peak after the bounce. Do not chase one LUFS number.', () => openAdvanced('master'));
+    } else {
+      toastMessage('Gentle bus is open. Core 5 integrated LUFS and true peak — Included in Basic $20. Studio master controls stay available.', () => openAdvanced('master'));
+    }
+  }
+  const runners = {autoTune, lockBeat, smartMix, exportWav, exportStems, recordTake, armLoop, openPocket, prepareSong, openComp, balanceToBeat, openMaster};
 
   function toastMessage(text, advanced, keep) {
     toast.hidden = false;
@@ -677,6 +719,8 @@ export async function mountCreate({shell, config}) {
     screen.className = 'iv-screen';
     screen.append(E('h2', 'Export'));
     const bits = allowed('24-bit') ? '24-bit' : '16-bit';
+    const heard = document.getElementById('status')?.textContent || '';
+    const delivery = heard.startsWith('Delivery note:') ? heard : 'Delivery note prints integrated LUFS, true peak, sample rate, bit depth, and BPM after export. No loudness figure is invented before the bounce.';
     const wav = E('button', 'Export ' + bits + ' WAV');
     wav.type = 'button';
     wav.id = 'ivExportWav';
@@ -686,7 +730,10 @@ export async function mountCreate({shell, config}) {
     mp3.type = 'button';
     mp3.className = 'iv-wide';
     mp3.onclick = exportMp3;
-    screen.append(wav, mp3, card('Export stems', 'Every track as WAV', () => runAction('exportStems'), {pro:true}));
+    const note = E('p', delivery);
+    note.id = 'ivDeliveryNote';
+    note.className = 'iv-sheet-meta';
+    screen.append(wav, mp3, card('Export stems', 'Every track as WAV', () => runAction('exportStems'), {pro:true}), note);
     return screen;
   }
   function subscribeView() {
@@ -874,7 +921,7 @@ export async function mountCreate({shell, config}) {
     if (button.id === 'core5Producer') return 'core5';
     if (button.id === 'exportStem') return 'stems';
     const text = button.textContent.trim();
-    if (button.closest('#steps') && /Master$/.test(text)) return 'core5_master';
+    if (text === 'Open Producer tools · mastering') return 'core5_master';
     if (text === 'GRIM rack' || text.startsWith('GRIM')) return 'grim';
     return GUARDS[text] || '';
   }

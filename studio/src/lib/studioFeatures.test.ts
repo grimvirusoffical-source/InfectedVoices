@@ -6,6 +6,7 @@ import { clampPocketSec, pocketAssistOffsetSec, POCKET_LIMIT_SEC } from './pocke
 import { loopRangeFromBars } from './transport.ts'
 import { estimateKey } from './keyEstimate.ts'
 import { REDX_INSTALL_COMMAND, VOCAL_LAB_V040 } from '../releases.ts'
+import { formatDeliveryNote, measureDelivery } from './delivery.ts'
 
 test('scale snap holds a concert A in A major', () => {
   const shift = snapSemitones(440, 'A', 'major', 8)
@@ -58,4 +59,24 @@ test('project lab bar loop is 4/4 at the session bpm', () => {
   assert.equal(swapped.startBar, 4)
   assert.equal(swapped.endBar, 4)
   assert.equal(swapped.endSec - swapped.startSec, 2)
+})
+
+test('delivery note measures a half-scale sine instead of inventing loudness', () => {
+  const rate = 48000
+  const data = new Float32Array(rate)
+  for (let i = 0; i < data.length; i++) data[i] = 0.5 * Math.sin((2 * Math.PI * 1000 * i) / rate)
+  const buffer = {
+    numberOfChannels: 1,
+    sampleRate: rate,
+    length: data.length,
+    getChannelData: () => data,
+  }
+  const metrics = measureDelivery(buffer as unknown as AudioBuffer)
+  assert.ok(Math.abs(metrics.samplePeakDb - -6.02) < 0.2)
+  assert.ok(metrics.truePeakDbtp > metrics.samplePeakDb - 0.05)
+  assert.ok(Number.isFinite(metrics.integratedLufs))
+  const note = formatDeliveryNote({ metrics, sampleRate: rate, bits: 16, bpm: 140 })
+  assert.match(note, /Delivery note: integrated .+ LUFS/)
+  assert.match(note, /true peak .+ dBTP/)
+  assert.match(note, /48000 Hz · 16-bit · 140 BPM/)
 })

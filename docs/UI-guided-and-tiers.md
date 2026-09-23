@@ -24,14 +24,14 @@ Overlay or coach marks — not a separate app.
 
 | Step | Title | Spotlight | Primary CTA | Skip |
 |------|-------|-----------|-------------|------|
-| 1 | Record | REC + mic permission | **Record a take** | Skip tour |
-| 2 | Loop | Bar-range loop | **Arm the loop** | |
-| 3 | Tune | InfectedTune / Precision | **Auto-tune take** | |
-| 4 | Pocket | Precision Pocket | **Open Pocket** | |
-| 5 | Mix | Smart Mix + Master | **One-click mix** | |
-| 6 | Project Lab | Project Lab | **Open Project Lab** | |
-| 7 | Producer | GRIM, Precision, Core 5 | **Open Producer** | |
-| 8 | Export | Export / Share | **Export WAV** | Done |
+| 1 | Prepare | Import / grid | **Import a beat** | Skip tour |
+| 2 | Record | REC + input peak | **Record a verse** | |
+| 3 | Comp | Takes | **Open takes** | |
+| 4 | Tune | Local InfectedTune | **Preview tune** | |
+| 5 | Timing | Conservative pocket | **Preview timing** | |
+| 6 | Mix | Balance to beat | **Balance to beat** | |
+| 7 | Master | Gentle bus / Core 5 | **Open master** | |
+| 8 | Export | Delivery note | **Export song** | Done |
 
 - Progress dots 1–8; Back / Next; “Don’t show again” on last step  
 - Resume coach from More → **Guided tour** anytime  

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { build } from 'esbuild';
+import { patchProducerDelivery } from './patch-producer-delivery.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const source=path.join(root,'app-source');
@@ -16,6 +17,7 @@ const classicSession=path.join(root,'browser-src','classic-session.js');
 execFileSync(process.execPath,[path.join(root,'scripts','build-web.mjs')],{cwd:root,stdio:'inherit'});
 await fs.rm(out,{recursive:true,force:true});
 await fs.cp(sourceWeb,out,{recursive:true});
+await patchProducerDelivery(path.join(out,'workstation','app.js'));
 await fs.writeFile(path.join(out,'package.json'),JSON.stringify({type:'module'})+'\n');
 await fs.copyFile(path.join(source,'classic-runtime.js'),path.join(out,'lab','studio-runtime.js'));
 await fs.copyFile(redxApi,path.join(out,'api.js'));

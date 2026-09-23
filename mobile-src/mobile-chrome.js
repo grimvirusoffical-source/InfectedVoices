@@ -127,6 +127,28 @@ export async function mountMobileChrome(){
  updates.onclick=showUpdates;host.onclick=showSettings;store.onclick=showStore;account.onclick=()=>shell.openExternal((config.nationOrigin||'https://nation.infectedvoices.space')+'/');
  const attach=()=>{const b=document.getElementById('studioUpdates');if(b&&b.dataset.ivBound!=='1'){b.dataset.ivBound='1';b.onclick=showUpdates;}};
  new MutationObserver(attach).observe(document.body,{childList:true,subtree:true});attach();
+ const meters=E('div');meters.id='ivMeters';meters.className='iv-meters';meters.setAttribute('aria-label','Producer meters');
+ const trackPeak=E('span','Track peak —');trackPeak.id='ivTrackPeak';
+ const masterPeak=E('span','Master peak —');masterPeak.id='ivMasterPeak';
+ const masterLoud=E('span','LUFS — · true peak —');masterLoud.id='ivMasterLufs';
+ meters.append(trackPeak,masterPeak,masterLoud);document.body.append(meters);
+ function syncMeters(){
+  const fill=document.getElementById('meterFill');
+  const width=fill?parseFloat(fill.style.width)||0:0;
+  if(width>0){
+    const db=20*Math.log10(Math.max(1e-8,width/100));
+    trackPeak.textContent='Track peak '+db.toFixed(1)+' dBFS'+(db>=-0.1?' · CLIP':'');
+  }
+  const status=document.getElementById('status')?.textContent||'';
+  if(status.includes('Delivery note:')){
+    const sample=status.match(/sample peak [^·]+/);
+    const lufs=status.match(/integrated [^·]+/);
+    const dbtp=status.match(/true peak [^·]+/);
+    if(sample)masterPeak.textContent='Master '+sample[0];
+    masterLoud.textContent=(lufs?lufs[0]:'LUFS —')+(dbtp?' · '+dbtp[0]:'');
+  }
+ }
+ setInterval(syncMeters,250);
  const bar=E('nav');bar.className='mobile-tabbar';bar.setAttribute('aria-label','Mobile studio shortcuts');bar.hidden=true;
  const svg=(paths)=>`<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
  const icons={

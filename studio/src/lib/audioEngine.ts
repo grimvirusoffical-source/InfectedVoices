@@ -67,6 +67,7 @@ export class InfectedAudioEngine {
     await this.space.generate()
     this.compressor = new Tone.Compressor({ threshold: -18, ratio: 3, attack: 0.01, release: 0.15 })
     this.gate = new Tone.Gate(-48)
+    // Safety ceiling at -1 dB. Lead defaults sit around -12 to -6 dBFS so this is not already limiting at idle.
     this.limiter = new Tone.Limiter(-1)
     this.masterOut = new Tone.Gain(1)
     this.monitorOut = new Tone.Gain(1)
@@ -147,6 +148,16 @@ export class InfectedAudioEngine {
     this.onTick?.(pos)
     this.runPitchDetect()
     this.raf = requestAnimationFrame(this.tick)
+  }
+
+  /** Sample peak of the pre-FX tap. Null until the engine is running. */
+  samplePeakDb() {
+    if (!this.analyser || !this.analyseBuf) return null
+    this.analyser.getFloatTimeDomainData(this.analyseBuf as unknown as Float32Array<ArrayBuffer>)
+    let peak = 0
+    for (let i = 0; i < this.analyseBuf.length; i++) peak = Math.max(peak, Math.abs(this.analyseBuf[i]))
+    if (peak < 1e-8) return Number.NEGATIVE_INFINITY
+    return 20 * Math.log10(peak)
   }
 
   private runPitchDetect() {

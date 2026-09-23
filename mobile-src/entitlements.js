@@ -134,8 +134,8 @@ export function canUse(featureId, signal = {}) {
 }
 
 export function lockBody(name, featureId) {
-  if (featureId && BASIC_PLUS.includes(entitlementKey(featureId))) return name + ' is on the $20 Basic plan.';
-  return name + ' is on the $40 Pro plan.';
+  if (featureId && BASIC_PLUS.includes(entitlementKey(featureId))) return name + ' — Included in Basic $20.';
+  return name + ' — Included in Pro $40.';
 }
 
 export function featureById(id) {
@@ -164,8 +164,8 @@ export function selfCheck() {
     if (can('free', id) || !can('basic', id) || !can('pro', id)) throw Error('Basic gate failed for ' + id);
   }
   if (!can('free', 'local_tune')) throw Error('Free local studio was gated.');
-  if (lockBody('Export stems', 'stems') !== 'Export stems is on the $40 Pro plan.') throw Error('Pro lock copy drifted.');
-  if (lockBody('Project Lab', 'project_lab') !== 'Project Lab is on the $20 Basic plan.') throw Error('Basic lock copy drifted.');
+  if (lockBody('Export stems', 'stems') !== 'Export stems — Included in Pro $40.') throw Error('Pro lock copy drifted.');
+  if (lockBody('Project Lab', 'project_lab') !== 'Project Lab — Included in Basic $20.') throw Error('Basic lock copy drifted.');
   if (storeBillingReady()) throw Error('Entitlements must not mark store billing ready before a verified purchase.');
   return true;
 }

@@ -6,7 +6,7 @@ Cap `webDir` is `dist/` from `npm run build:web`. The pinned vendor payload is *
 
 ## Plans
 
-Pricing source of truth: `docs/STUDY-infectedvoices-pricing.md`. A signed-in account is **Free**. `allowed`, lifetime, a Nation social plan (`infectious` / `plague`), or a client boolean is not Basic or Pro. Server `studioPlan` is the paid signal. Until store products are live, Activate Basic / Activate Pro is a QA flip of that same plan field.
+Pricing source of truth: `docs/STUDY-infectedvoices-pricing.md`. Producer bar: `docs/STUDY-infectedvoices-producer-level.md`. Export prints a delivery note (integrated LUFS, true peak, sample rate, bit depth, BPM). Pitch, timing, and AI bounces are preview, then Keep. Create does not remove Studio. A signed-in account is **Free**. `allowed`, lifetime, a Nation social plan (`infectious` / `plague`), or a client boolean is not Basic or Pro. Server `studioPlan` is the paid signal. Until store products are live, Activate Basic / Activate Pro is a QA flip of that same plan field.
 
 | Tier | What it unlocks |
 |---|---|
