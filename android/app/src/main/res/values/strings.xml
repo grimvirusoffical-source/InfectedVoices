@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Infected Voices</string>
+    <string name="title_activity_main">Infected Voices</string>
+    <string name="package_name">space.infectedvoices.studio</string>
+    <string name="custom_url_scheme">space.infectedvoices.studio</string>
+</resources>

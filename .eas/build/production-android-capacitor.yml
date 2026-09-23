@@ -1,0 +1,24 @@
+build:
+  name: Infected Voices Core 5 Android
+  steps:
+    - eas/checkout
+    - eas/install_node_modules
+    - eas/resolve_build_config
+    - run:
+        name: Rebuild Capacitor Android project on Linux
+        command: npm run sync:android
+    - eas/inject_android_credentials
+    - eas/configure_android_version
+    - run:
+        name: Build signed Android App Bundle with Java 21
+        command: |
+          sudo apt-get update -qq
+          sudo apt-get install -y openjdk-21-jdk
+          sed -i 's/\r$//' android/gradlew
+          chmod +x android/gradlew
+          export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+          export PATH="$JAVA_HOME/bin:$PATH"
+          java -version
+          cd android
+          ./gradlew :app:bundleRelease
+    - eas/find_and_upload_build_artifacts

@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Infected Voices",
+    "slug": "infected-voices-core5",
+    "version": "0.6.5",
+    "scheme": "infectedvoices",
+    "ios": {
+      "bundleIdentifier": "space.infectedvoices.studio",
+      "buildNumber": "1",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "space.infectedvoices.studio",
+      "versionCode": 1
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0948decd-e7ed-4996-bc7b-3596280a8837"
+      }
+    }
+  }
+}

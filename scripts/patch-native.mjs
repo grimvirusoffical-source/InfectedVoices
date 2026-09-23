@@ -33,7 +33,45 @@ async function patchIOS(){
       await fs.copyFile(path.join(root,'assets','app-splash.png'),path.join(splashDir,name));
     }
   }catch{}
-  console.log('Patched Apple permissions, URL scheme, privacy manifest and artwork.');
+
+  const swiftPackagePath=path.join(root,'ios','App','CapApp-SPM','Package.swift');
+  try{
+    let swiftPackage=await fs.readFile(swiftPackagePath,'utf8');
+    swiftPackage=swiftPackage.replaceAll('\\\\','/');
+    await fs.writeFile(swiftPackagePath,swiftPackage);
+  }catch{}
+
+  const projectPath=path.join(root,'ios','App','App.xcodeproj','project.pbxproj');
+  const project=await fs.readFile(projectPath,'utf8');
+  const targetMatch=project.match(/([A-F0-9]{24}) \/\* App \*\/ = \{\s*isa = PBXNativeTarget;/);
+  if(!targetMatch)throw Error('Could not locate the iOS App target for the shared scheme.');
+  const targetId=targetMatch[1];
+  const schemeDir=path.join(root,'ios','App','App.xcodeproj','xcshareddata','xcschemes');
+  await fs.mkdir(schemeDir,{recursive:true});
+  const ref=`<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="${targetId}" BuildableName="App.app" BlueprintName="App" ReferencedContainer="container:App.xcodeproj"></BuildableReference>`;
+  const scheme=`<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="1600" version="1.7">
+<BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries><BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">${ref}</BuildActionEntry></BuildActionEntries></BuildAction>
+<TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"><Testables/></TestAction>
+<LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">${ref}</BuildableProductRunnable></LaunchAction>
+<ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES"><BuildableProductRunnable runnableDebuggingMode="0">${ref}</BuildableProductRunnable></ProfileAction>
+<AnalyzeAction buildConfiguration="Debug"/>
+<ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>
+</Scheme>
+`;
+  await fs.writeFile(path.join(schemeDir,'App.xcscheme'),scheme);
+
+  const easProjectDir=path.join(root,'ios','App.xcodeproj');
+  await fs.rm(easProjectDir,{recursive:true,force:true});
+  await fs.mkdir(path.join(easProjectDir,'xcshareddata','xcschemes'),{recursive:true});
+  let easProject=project
+    .replace('path = ../debug.xcconfig;','path = debug.xcconfig;')
+    .replace('\t\t\tpath = App;','\t\t\tpath = App/App;')
+    .replace(/INFOPLIST_FILE = App\/Info\.plist;/g,'INFOPLIST_FILE = App/App/Info.plist;')
+    .replace('relativePath = "CapApp-SPM";','relativePath = "App/CapApp-SPM";');
+  await fs.writeFile(path.join(easProjectDir,'project.pbxproj'),easProject);
+  await fs.writeFile(path.join(easProjectDir,'xcshareddata','xcschemes','App.xcscheme'),scheme);
+  console.log('Patched Apple permissions, URL scheme, privacy manifest, shared scheme, EAS project shim and artwork.');
 }
 
 function setApplicationAttribute(xml,name,value){

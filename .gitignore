@@ -4,3 +4,7 @@ app-source/
 .DS_Store
 *.xcuserdata
 DerivedData/
+.secrets/
+
+.vocal-lab/
+.browser-studio/

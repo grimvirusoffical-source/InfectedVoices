@@ -2,7 +2,7 @@
   "appId": "space.infectedvoices.studio",
   "appName": "Infected Voices",
   "webDir": "dist",
-  "backgroundColor": "#101014",
+  "backgroundColor": "#09090B",
   "server": {
     "cleartext": false
   },

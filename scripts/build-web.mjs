@@ -17,7 +17,10 @@ await fs.copyFile(path.join(src,'classic-runtime.js'),path.join(out,'lab','studi
 await build({entryPoints:{'lab/account-entry':path.join(src,'classic-source','account.js'),'lab/mp3-codec':path.join(src,'classic-source','codec.js')},bundle:true,format:'esm',platform:'browser',outdir:out,target:['safari17','chrome120'],minify:false,legalComments:'eof',define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:{'mobile-shell':path.join(root,'mobile-src','mobile-shell-src.js')},bundle:true,format:'esm',platform:'browser',outdir:out,target:['safari17','chrome120'],minify:false,legalComments:'eof',define:{'process.env.NODE_ENV':'"production"'}});
 await fs.copyFile(path.join(root,'mobile-src','mobile-chrome.js'),path.join(out,'mobile-chrome.js'));
+await fs.copyFile(path.join(root,'mobile-src','mobile-create.js'),path.join(out,'mobile-create.js'));
+await fs.copyFile(path.join(root,'mobile-src','entitlements.js'),path.join(out,'entitlements.js'));
 await fs.copyFile(path.join(root,'mobile-src','mobile.css'),path.join(out,'mobile.css'));
+await fs.cp(path.join(root,'mobile-src','fonts'),path.join(out,'fonts'),{recursive:true});
 const mobileEntry=(await fs.readFile(path.join(root,'mobile-src','mobile-entry-src.js'),'utf8')).replace("import './mobile-shell-src.js';","import './mobile-shell.js';");
 await fs.writeFile(path.join(out,'mobile-entry.js'),mobileEntry);
 const mobileClassic=(await fs.readFile(path.join(root,'mobile-src','mobile-classic-src.js'),'utf8')).replace("import './mobile-shell-src.js';","import '../mobile-shell.js';");
@@ -25,13 +28,14 @@ await fs.writeFile(path.join(out,'lab','mobile-classic.js'),mobileClassic);
 let studio=await fs.readFile(path.join(out,'studio.html'),'utf8');
 studio=studio.replace("<link rel='stylesheet' href='./workstation/studio.css'>","<link rel='stylesheet' href='./workstation/studio.css'>\n  <link rel='stylesheet' href='./mobile.css'>")
  .replace("src='./entry.js'","src='./mobile-entry.js'")
+ .replace("content='#101014'","content='#09090B'")
  .replace(/0\.6 COLLAB PILOT/g,'CORE 5 MOBILE')
- .replace(/Continue with Google/g,'Continue to account')
- .replace(/Sign in with Google to view and use Infected Voices\.[^<]*/g,'Sign in to use your Infected Voices account. Authorization opens securely in your browser and returns you to the app.')
+ .replace(/Continue with Google/g,'Sign in with Google or Apple')
+ .replace(/Sign in with Google to view and use Infected Voices\.[^<]*/g,'Sign in with Google or Apple to use your Infected Voices account. Authorization opens securely in your browser and returns you to the app.')
  .replace(/This release is a preview; retain project backups\./g,'Keep portable project backups before major edits or app updates.');
 await fs.writeFile(path.join(out,'studio.html'),studio);
 let lab=await fs.readFile(path.join(out,'lab','index.html'),'utf8');
-lab=lab.replace('</head>','  <link rel="stylesheet" href="../mobile.css">\n</head>')
+lab=lab.replace('content="#100d17"','content="#09090B"').replace('</head>','  <link rel="stylesheet" href="../mobile.css">\n</head>')
  .replace(/<script type="module" src="\.\/account-entry\.js"><\/script>/,'<script type="module" src="./mobile-classic.js"></script>')
  .replace(/<script>if\('serviceWorker'[\s\S]*?<\/script>/g,'')
  .replace(/On iPhone, iPad or Android,[\s\S]*?loads updates when reopened\./,'This is the native mobile build. Projects and recordings remain local unless you explicitly export them. App updates are distributed through your platform app store.');
@@ -39,4 +43,20 @@ await fs.writeFile(path.join(out,'lab','index.html'),lab);
 await fs.rm(path.join(out,'sw.js'),{force:true});
 await fs.rm(path.join(out,'manifest.webmanifest'),{force:true});
 for(const html of ['studio.html','lab/index.html']){const p=path.join(out,html),t=await fs.readFile(p,'utf8');if(/serviceWorker\.register|src=['"]\.\/?entry\.js/.test(t))throw Error('Native build still contains a web bootstrap/update path: '+html);}
+const studioDir=path.join(root,'studio');
+const vocalOut=path.join(root,'.vocal-lab');
+const npmBin=process.platform==='win32'?'npm.cmd':'npm';
+execFileSync(npmBin,['install','--include=dev','--ignore-scripts','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+execFileSync(npmBin,['run','build:cap','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+await fs.cp(vocalOut,out,{recursive:true});
+await fs.copyFile(path.join(root,'mobile-src','vocal-bridge.js'),path.join(out,'vocal-bridge.js'));
+let vocalIndex=await fs.readFile(path.join(out,'index.html'),'utf8');
+if(!vocalIndex.includes('content="0.7.0"'))throw Error('Vocal Lab build did not replace the Cap home page.');
+if(!vocalIndex.includes('vocal-bridge.js'))vocalIndex=vocalIndex.replace('</body>','  <script type="module" src="./vocal-bridge.js"></script>\n</body>');
+await fs.writeFile(path.join(out,'index.html'),vocalIndex);
+const downloadPage=path.join(root,'download','index.html');
+await fs.mkdir(path.join(out,'get'),{recursive:true});
+await fs.mkdir(path.join(out,'download'),{recursive:true});
+await fs.copyFile(downloadPage,path.join(out,'get','index.html'));
+await fs.copyFile(downloadPage,path.join(out,'download','index.html'));
 console.log('Prepared Infected Voices Core 5 mobile web payload in dist/');
