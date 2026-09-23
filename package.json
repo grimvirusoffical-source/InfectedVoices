@@ -37,5 +37,11 @@
   "devDependencies": {
     "@capacitor/cli": "8.0.0",
     "esbuild": "0.25.9"
+  },
+  "redx": {
+    "install_command": "npm install --include=dev --ignore-scripts",
+    "build_command": "npm run build:browser",
+    "start_command": "npm run start:redx",
+    "port": 8791
   }
 }

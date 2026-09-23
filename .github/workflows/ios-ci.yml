@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --ignore-scripts
+      - run: npm install --include=dev --ignore-scripts
       - run: npm run build:web
   ios-simulator:
     runs-on: macos-latest
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --ignore-scripts
+      - run: npm install --include=dev --ignore-scripts
       - run: npm run native:ios
       - name: Build unsigned simulator app
         run: xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -configuration Debug -derivedDataPath "$PWD/.derived" CODE_SIGNING_ALLOWED=NO build

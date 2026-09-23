@@ -1,9 +1,13 @@
 # Infected Voices — browser host, Windows, and mobile
 
-RedXAIHost serves this branch. `npm run build:browser` writes `browser-dist/`, and `npm run start:redx` listens on port **8791** (override with `PORT`). The home page is Studio 0.7.0, including the Vocal Lab v0.4.1 surface: bar/beat practice, Pocket Assist, Ultimate Mic Master, Grim Beats, the member’s own RoEx key field, and the v0.4.0 / v0.4.1 Windows channel notes. Arrangement Studio stays at `studio.html`. Account sign-in is the existing browser adapter. This repo does not ship Windows ZIPs or signing keys.
+RedXAIHost serves this branch. `npm run build:browser` writes `browser-dist/`, and `npm run start:redx` listens on port **8791** (override with `PORT`). The home page is Studio 0.7.0, including the Vocal Lab v0.4.1 surface: bar/beat practice, Pocket Assist, Ultimate Mic Master, Grim Beats, the member’s own RoEx key field, and the published v0.4.0 source release. Arrangement Studio stays at `studio.html`. Account sign-in is the existing browser adapter.
+
+The published GitHub release is tag `Release`, name `v0.4.0`, branch `native/v040-unified-studio`. Its source zipball is [https://github.com/grimvirusoffical-source/InfectedVoices/zipball/Release](https://github.com/grimvirusoffical-source/InfectedVoices/zipball/Release). There is no v0.4.1 GitHub release and no uploaded installer. `npm run package:windows` only stages a local Electron shell. Signing keys stay outside the repository.
+
+RedXAIHost `install_command` is exactly `npm install --include=dev --ignore-scripts` (`package.json` → `redx.install_command`). `esbuild` is a root devDependency. The host sets `NODE_ENV=production`, so a plain `npm install` skips it and `build:browser` fails. `--ignore-scripts` matches the host; the Bungee worklet bundles are already committed.
 
 ```bash
-npm install
+npm install --include=dev --ignore-scripts
 npm run build:browser
 npm run start:redx
 ```
@@ -31,7 +35,7 @@ The store release is intentionally scoped to **Core 5**. Unreleased Core 6 colla
 ## iPhone / iPad
 
 ```bash
-npm install
+npm install --include=dev --ignore-scripts
 npm run native:ios
 ```
 
@@ -40,7 +44,7 @@ Open `ios/App/App.xcodeproj` in Xcode, select your Apple Developer Team, test on
 ## Android
 
 ```bash
-npm install
+npm install --include=dev --ignore-scripts
 npm run native:android
 ```
 

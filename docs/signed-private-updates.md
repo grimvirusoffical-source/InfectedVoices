@@ -14,6 +14,7 @@ Design notes for the Windows channel. This repository does not contain a private
 
 - Browser builds do not check for updates.
 - iOS and Android open the App Store or Google Play. They do not download a replacement studio.
+- The Windows panel links the published v0.4.0 source zipball (tag `Release`, branch `native/v040-unified-studio`). That zipball is source, and GitHub lists no v0.4.1 release.
 - The Windows preload reports the channel as unprovisioned and does not contact a server.
 - The in-app Updates panel describes the steps above so the flow is visible before a key exists.
 

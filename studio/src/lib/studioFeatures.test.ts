@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { snapSemitones } from './pitchMath.ts'
 import { clampPocketSec, pocketAssistOffsetSec, POCKET_LIMIT_SEC } from './pocket.ts'
 import { loopRangeFromBars } from './transport.ts'
 import { estimateKey } from './keyEstimate.ts'
+import { REDX_INSTALL_COMMAND, VOCAL_LAB_V040 } from '../releases.ts'
 
 test('scale snap holds a concert A in A major', () => {
   const shift = snapSemitones(440, 'A', 'major', 8)
@@ -34,6 +36,19 @@ test('A–B key estimate hears a concert A', () => {
   for (let i = 0; i < data.length; i++) data[i] = Math.sin((2 * Math.PI * 440 * i) / sampleRate) * 0.6
   const guess = estimateKey(data, sampleRate)
   assert.equal(guess?.key, 'A')
+})
+
+test('published v0.4.0 artifact is the Release source zipball', () => {
+  assert.equal(VOCAL_LAB_V040.name, 'v0.4.0')
+  assert.equal(VOCAL_LAB_V040.tag, 'Release')
+  assert.equal(VOCAL_LAB_V040.branch, 'native/v040-unified-studio')
+  assert.equal(VOCAL_LAB_V040.zipball, 'https://github.com/grimvirusoffical-source/InfectedVoices/zipball/Release')
+  assert.equal(VOCAL_LAB_V040.page, 'https://github.com/grimvirusoffical-source/InfectedVoices/releases/tag/Release')
+  const pkg = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'))
+  assert.equal(pkg.redx.install_command, REDX_INSTALL_COMMAND)
+  assert.equal(REDX_INSTALL_COMMAND, 'npm install --include=dev --ignore-scripts')
+  const buildBrowser = readFileSync(new URL('../../../scripts/build-browser.mjs', import.meta.url), 'utf8')
+  assert.match(buildBrowser, /install','--include=dev','--ignore-scripts','--prefix'/)
 })
 
 test('project lab bar loop is 4/4 at the session bpm', () => {

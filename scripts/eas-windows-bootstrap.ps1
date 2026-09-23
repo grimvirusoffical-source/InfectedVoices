@@ -13,7 +13,7 @@ Run-Step 'Check Node.js' {
 }
 
 Run-Step 'Install project dependencies' {
-  npm install
+  npm install --include=dev --ignore-scripts
 }
 
 Run-Step 'Authenticate Expo / EAS' {

@@ -36,6 +36,7 @@ import { loopRangeFromBars, secToBar } from './lib/transport'
 import { QRCodeSVG } from 'qrcode.react'
 import { shiftAudioBuffer } from './lib/audioShift'
 import { STUDIO_VERSION } from './version'
+import { REDX_INSTALL_COMMAND, VOCAL_LAB_V040 } from './releases'
 import './index.css'
 
 type Tab =
@@ -618,7 +619,7 @@ export default function App() {
         <p className="eyebrow">Vocal Lab channel v0.4.1 · Studio {STUDIO_VERSION}</p>
         <h1>Sign in to open Studio.</h1>
         <p>
-          The recording workspace stays behind the existing account sign-in. Studio and the versioned Windows downloads stay locked until that account has a subscription or lifetime code.
+          The recording workspace stays behind the existing account sign-in. Studio stays locked until that account has a subscription or lifetime code. The published {VOCAL_LAB_V040.name} download is the public source zipball on GitHub.
         </p>
         {hostError && <p className="error">{hostError}</p>}
         <div className="cta-row">
@@ -1303,29 +1304,44 @@ export default function App() {
           <section className="panel">
             <h2>Windows channel</h2>
             <p className="panel-lead">
-              Vocal Lab desktop releases from v0.4.0 forward. v0.4.1 is the full Windows application ZIP. v0.4.0 stays in the history as the earlier launch script. The ZIP is not embedded here.
+              GitHub release {VOCAL_LAB_V040.name} uses tag {VOCAL_LAB_V040.tag} and branch {VOCAL_LAB_V040.branch}. The download is that branch’s source zipball. Vocal Lab v0.4.1 is the channel in this Studio {STUDIO_VERSION} host. GitHub has no v0.4.1 release.
             </p>
             <div className="take">
               <div>
-                <strong>v0.4.1 · current</strong>
-                <div className="muted">Infected Voices.exe in its own window. WebView2 is required. Extract the whole ZIP into a new folder.</div>
+                <strong>{VOCAL_LAB_V040.name} · source release</strong>
+                <div className="muted">
+                  Tag {VOCAL_LAB_V040.tag} · branch {VOCAL_LAB_V040.branch}. Source zipball. The release page lists no uploaded installer assets.
+                </div>
               </div>
-              <span className="pill">Account-gated</span>
+              <a className="pill on" href={VOCAL_LAB_V040.zipball}>
+                Source zipball
+              </a>
             </div>
             <div className="take">
               <div>
-                <strong>v0.4.0 · history</strong>
-                <div className="muted">Earlier launch script. Keep that folder if you still need it. Do not convert its private project files in place.</div>
+                <strong>v0.4.1 · vocal lab channel</strong>
+                <div className="muted">
+                  Bar loop, Pocket Assist, Ultimate Mic Master, Grim Beats, and layout modes in this host. No second zipball and no installer URL.
+                </div>
               </div>
-              <span className="pill">History</span>
+              <span className="pill">In this host</span>
             </div>
             <ol className="notes">
-              <li>Sign in, then use Download for Windows only after the account server confirms Studio access.</li>
-              <li>Extract all and keep every file together. Leave the old v0.3.0 folder as a backup.</li>
-              <li>Open Infected Voices.exe. Sign in with the same account and refresh access if Studio is still locked.</li>
-              <li>Record a short test before a real session. For a newer build, close the old app, extract the new ZIP to a new folder, and import WAV takes yourself.</li>
+              <li>
+                Download the {VOCAL_LAB_V040.name} source zipball, or open the{' '}
+                <a href={VOCAL_LAB_V040.page}>release page</a>.
+              </li>
+              <li>
+                Install with <code>{REDX_INSTALL_COMMAND}</code>, then run <code>npm run build:browser</code>. esbuild is a devDependency, so the install must include dev packages.
+              </li>
+              <li>
+                <code>npm run package:windows</code> stages a local Electron shell from <code>browser-dist/</code>. It does not sign the app.
+              </li>
+              <li>Phone and tablet builds still ship through the App Store and Google Play.</li>
             </ol>
-            <p className="muted">This repository does not contain the Windows ZIPs or a signing key. `npm run package:windows` only stages a local Electron shell from this browser build.</p>
+            <p className="muted">
+              A signing key for private desktop updates stays outside this repository. The source zipball is the published v0.4.0 artifact.
+            </p>
           </section>
         )}
 

@@ -78,7 +78,7 @@ await fs.rm(path.join(out,'sw.js'),{force:true});
 
 const studioOut=path.join(root,'.browser-studio');
 const npmBin=process.platform==='win32'?'npm.cmd':'npm';
-execFileSync(npmBin,['install','--prefix',path.join(root,'studio')],{cwd:root,stdio:'inherit'});
+execFileSync(npmBin,['install','--include=dev','--ignore-scripts','--prefix',path.join(root,'studio')],{cwd:root,stdio:'inherit'});
 execFileSync(npmBin,['run','build:host','--prefix',path.join(root,'studio')],{cwd:root,stdio:'inherit'});
 await fs.copyFile(path.join(studioOut,'index.html'),path.join(out,'index.html'));
 await fs.cp(path.join(studioOut,'assets'),path.join(out,'assets'),{recursive:true});

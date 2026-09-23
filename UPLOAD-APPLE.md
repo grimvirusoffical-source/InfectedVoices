@@ -2,7 +2,7 @@
 
 1. Clone this repository on your Mac.
 2. Install Node 22+ and the current Xcode supported by Capacitor 8.
-3. Run `npm install` then `npm run native:ios`.
+3. Run `npm install --include=dev --ignore-scripts` then `npm run native:ios`.
 4. Open `ios/App/App.xcodeproj`.
 5. Select the **App** target → **Signing & Capabilities** → choose your Apple Developer Team.
 6. Confirm bundle id `space.infectedvoices.studio` (or your registered replacement), version/build number and display name.

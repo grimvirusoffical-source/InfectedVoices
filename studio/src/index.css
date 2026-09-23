@@ -319,6 +319,9 @@ code {
   font-variant-numeric: tabular-nums;
   background: var(--bg);
 }
+a.pill {
+  text-decoration: none;
+}
 .pill.on {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
   color: var(--accent);

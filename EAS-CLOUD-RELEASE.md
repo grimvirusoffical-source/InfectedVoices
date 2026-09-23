@@ -6,7 +6,7 @@ You do not need a Mac for this release path. EAS Build uploads the generated nat
 
 1. Install Node.js 22+ and Git.
 2. Clone this repository and switch to the `eas-cloud-release` branch.
-3. Run `npm install`.
+3. Run `npm install --include=dev --ignore-scripts`. `esbuild` is a devDependency, and RedXAIHost uses that exact install command.
 4. Run `npx eas-cli@latest login` or set an Expo personal access token in the local environment.
 5. Run `npx eas-cli@latest init` once to link this repository to the Expo project.
 6. Generate the native projects locally without compiling them:
