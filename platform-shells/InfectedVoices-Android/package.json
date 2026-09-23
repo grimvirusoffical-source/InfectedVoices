@@ -1,0 +1,15 @@
+{
+  "name": "infectedvoices-android",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Thin Capacitor Android shell. Play upload is not run from the populate step.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test scripts/self-check.test.mjs",
+    "check": "node scripts/prepare-android.mjs --check",
+    "sync": "node scripts/prepare-android.mjs --sync"
+  }
+}
