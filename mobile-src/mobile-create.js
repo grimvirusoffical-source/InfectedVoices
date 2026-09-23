@@ -277,7 +277,21 @@ export async function mountCreate({shell, config}) {
       align.click();
       await waitIdle();
     }
-    toastMessage('Lock to Beat preview is ready.', () => openAdvanced('beat'));
+    toastMessage('Lock to Beat preview is ready.', () => openAdvanced('beat'), keepBeat);
+  }
+  async function keepBeat() {
+    if (arrangement()) {
+      const committed = clickNamed('Keep this alignment') || clickNamed('Keep alignment');
+      if (!committed) throw Error('Preview alignment first, then Keep can commit it.');
+      await waitIdle();
+      assertStatus();
+    } else {
+      const apply = document.getElementById('applyAlign');
+      if (!apply) throw Error('Preview alignment first, then Keep can commit it.');
+      apply.click();
+      await waitIdle();
+    }
+    toastMessage('Alignment kept. The selected vocal now uses that timing. Undo restores the prior clip.', () => openAdvanced('beat'));
   }
   function armLoop() {
     const input = document.getElementById('loop');
@@ -383,10 +397,21 @@ export async function mountCreate({shell, config}) {
   }
   const runners = {autoTune, lockBeat, smartMix, exportWav, exportStems, recordTake, armLoop};
 
-  function toastMessage(text, advanced) {
+  function toastMessage(text, advanced, keep) {
     toast.hidden = false;
     toast.replaceChildren();
     toast.append(E('p', text));
+    if (keep) {
+      const commit = E('button', 'Keep');
+      commit.type = 'button';
+      commit.className = 'primary';
+      commit.onclick = async () => {
+        toast.hidden = true;
+        try { await keep(); }
+        catch (error) { alert(error.message); }
+      };
+      toast.append(commit);
+    }
     const link = E('button', 'Open advanced settings');
     link.type = 'button';
     link.className = 'ghost';

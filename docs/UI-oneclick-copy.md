@@ -2,13 +2,17 @@
 
 ## Coach
 1. Record — “Hit REC and spit a take. Headphones help.”
-2. Tune — “Snap pitch to the key. Start with Auto-Tune — go deeper anytime.”
-3. Mix — “One tap balances levels and loudness. Open Mixer to tweak.”
-4. Export — “Bounce WAV or MP3. Stems need Pro.”
+2. Loop — “Loop a bar range, then record. Loop+Rec stays on while both are running.”
+3. Tune — “Snap pitch to the key. Start with Auto-Tune — go deeper anytime.”
+4. Pocket — “Assist stays inside ±80 ms. Precision Pocket is on Basic.”
+5. Mix — “One tap balances levels and loudness. Open Mixer to tweak.”
+6. Project Lab — “Stem gain, offset, and the take vault are on Basic.”
+7. Producer — “GRIM, Precision, and Core 5 Producer are on Basic.”
+8. Export — “Bounce WAV or MP3. Free export is 16-bit. Stems need Pro.”
 
 ## CTAs
 - Auto-Tune — “Clean pitch, still sounds like you”
-- Lock to Beat — “Nudge timing to the pocket”
+- Lock to Beat — “Nudge timing to the pocket”. Preview, then **Keep** commits it. “Open advanced settings” stays secondary.
 - Smart Mix + Master — “Radio-ready loudness, fast”
 - Isolate Vocal — “Pull the vocal stem” (Pro)
 - Export stems — “Every track as WAV” (Pro)

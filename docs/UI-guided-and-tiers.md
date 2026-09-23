@@ -19,17 +19,21 @@ Toggle in header: segmented **Create | Studio**. Persist per account. Switching 
 
 ## 2. Guided walkthrough (record → tune → mix → export)
 
-### First-run coach (4 steps, dismissible)
+### First-run coach (8 steps, dismissible)
 Overlay or coach marks — not a separate app.
 
 | Step | Title | Spotlight | Primary CTA | Skip |
 |------|-------|-----------|-------------|------|
 | 1 | Record | REC + mic permission | **Record a take** | Skip tour |
-| 2 | Tune | InfectedTune / Precision | **Auto-tune take** | |
-| 3 | Mix | Smart Mix + Master | **One-click mix** | |
-| 4 | Export | Export / Share | **Export WAV** | Done |
+| 2 | Loop | Bar-range loop | **Arm the loop** | |
+| 3 | Tune | InfectedTune / Precision | **Auto-tune take** | |
+| 4 | Pocket | Precision Pocket | **Open Pocket** | |
+| 5 | Mix | Smart Mix + Master | **One-click mix** | |
+| 6 | Project Lab | Project Lab | **Open Project Lab** | |
+| 7 | Producer | GRIM, Precision, Core 5 | **Open Producer** | |
+| 8 | Export | Export / Share | **Export WAV** | Done |
 
-- Progress dots 1–4; Back / Next; “Don’t show again” on last step  
+- Progress dots 1–8; Back / Next; “Don’t show again” on last step  
 - Resume coach from More → **Guided tour** anytime  
 - Cap: 44px CTAs; sheet from bottom on phone  
 - Desktop: right-side tip card 320px, same copy
