@@ -13,9 +13,9 @@ for(const marker of ['saveFile','signIn','hostCheck','checkUpdates'])if(!shell.i
 const entry=await fs.readFile(path.join(dist,'mobile-entry.js'),'utf8');
 if(entry.includes('Core6Collaboration'))throw Error('Unreleased Core 6 collaboration bootstrap leaked into the Core 5 mobile release.');
 const chrome=await fs.readFile(path.join(dist,'mobile-chrome.js'),'utf8');
-for(const marker of ['mobileHostSettings','mobileUpdates','device-v1','hostCheck','checkUpdates','installUpdate','core3Mixer','core5Producer','Open store listing','Check server'])if(!chrome.includes(marker))throw Error('Mobile chrome missing '+marker);
+for(const marker of ['mobileHostSettings','mobileUpdates','device-v1','hostCheck','checkUpdates','installUpdate','core3Mixer','core5Producer','Open store listing','Check server','Search features','GRIM rack','Precision Tune'])if(!chrome.includes(marker))throw Error('Mobile chrome missing '+marker);
 const css=await fs.readFile(path.join(dist,'mobile.css'),'utf8');
-for(const marker of ['#5E6AD2','#6E79D6','safe-area-inset','mobile-tabbar','--iv-accent'])if(!css.includes(marker))throw Error('Mobile stylesheet missing '+marker);
+for(const marker of ['#09090B','#6E79D6','#27272A','--surface','--touch','--accent-muted','safe-area-inset','mobile-tabbar','--iv-accent'])if(!css.includes(marker))throw Error('Mobile stylesheet missing '+marker);
 const font=await fs.stat(path.join(dist,'fonts','InterVariable.woff2')).catch(()=>null);
 if(!font?.isFile()||font.size<1000)throw Error('Inter font missing from mobile web payload.');
 const create=await fs.readFile(path.join(dist,'mobile-create.js'),'utf8');

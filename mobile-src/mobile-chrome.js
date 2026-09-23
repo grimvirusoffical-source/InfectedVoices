@@ -61,16 +61,59 @@ export async function mountMobileChrome(){
  const bar=E('nav');bar.className='mobile-tabbar';bar.setAttribute('aria-label','Mobile studio shortcuts');bar.hidden=true;
  const svg=(paths)=>`<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
  const icons={
-  studio:svg('<path d="M4 7h16M4 12h16M4 17h10"/>'),
-  tracks:svg('<path d="M5 7h14M5 12h14M5 17h14"/><path d="M8 7v10M16 7v10"/>'),
-  record:svg('<circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="8"/>'),
-  mix:svg('<path d="M6 4v16M12 4v16M18 4v16"/><circle cx="6" cy="9" r="2" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="2" fill="currentColor" stroke="none"/><circle cx="18" cy="8" r="2" fill="currentColor" stroke="none"/>'),
-  producer:svg('<path d="M5 16l4-8 3 5 3-6 4 9"/>'),
   arrange:svg('<path d="M4 15c2-6 4-6 6 0s4 6 6 0 4-6 4 0"/>'),
-  sound:svg('<circle cx="12" cy="12" r="3"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/>'),
-  timing:svg('<circle cx="12" cy="13" r="7"/><path d="M12 10v4l2 2M9 4h6"/>'),
+  tracks:svg('<path d="M5 7h14M5 12h14M5 17h14"/><path d="M8 7v10M16 7v10"/>'),
+  mix:svg('<path d="M6 4v16M12 4v16M18 4v16"/><circle cx="6" cy="9" r="2" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="2" fill="currentColor" stroke="none"/><circle cx="18" cy="8" r="2" fill="currentColor" stroke="none"/>'),
+  tune:svg('<circle cx="12" cy="12" r="3"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/>'),
+  more:svg('<circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.4" fill="currentColor" stroke="none"/>'),
   export:svg('<path d="M12 4v11M8 8l4-4 4 4M5 20h14"/>')
  };
+ const arrangement=!!document.querySelector('.arrangement');
+ function clickStage(index){document.querySelectorAll('#steps button')[index]?.click();}
+ function openFeatures(){
+  const {body}=open('Core 5','More');
+  const search=E('input');search.type='search';search.placeholder='Search features';search.setAttribute('aria-label','Search features');search.enterKeyHint='search';
+  const list=E('div');list.className='iv-more-list';
+  const go=fn=>()=>{const run=()=>fn();if(modal.open){modal.addEventListener('close',run,{once:true});modal.close();}else run();};
+  const items=arrangement?[
+   ['Record',go(()=>document.getElementById('record')?.click())],
+   ['Producer',go(()=>document.getElementById('core5Producer')?.click())],
+   ['GRIM rack',go(()=>document.getElementById('core5Producer')?.click())],
+   ['Automation',go(()=>document.getElementById('core5Producer')?.click())],
+   ['Sidechain',go(()=>document.getElementById('core5Producer')?.click())],
+   ['Precision Tune',go(()=>clickStage(4))],
+   ['Pocket',go(()=>clickStage(3))],
+   ['Mastering',go(()=>clickStage(6))],
+   ['Export',go(()=>clickStage(7))],
+   ['Plugins',go(()=>document.getElementById('pluginsTab')?.click())],
+   ['Release & connect',go(()=>document.getElementById('integrationsTab')?.click())],
+   ['AI tools',go(()=>document.getElementById('aiTab')?.click())],
+   ['Tutorial',go(()=>document.getElementById('tutorial')?.click())],
+   ['Saved projects',go(()=>document.getElementById('openSaved')?.click())],
+   ['Classic Studio',go(()=>{location.href='lab/index.html';})],
+   ['Settings',go(showSettings)],
+   ['App updates',go(showUpdates)]
+  ]:[
+   ['Timing',go(()=>scrollTo('.panel.timing'))],
+   ['Record',go(()=>document.getElementById('record')?.click())],
+   ['Tune',go(()=>scrollTo('.panel.sound'))],
+   ['Mix',go(()=>scrollTo('.mixbox'))],
+   ['Export',go(()=>scrollTo('.panel.export'))],
+   ['Arrangement Studio',go(()=>{location.href='../studio.html';})],
+   ['Settings',go(showSettings)],
+   ['App updates',go(showUpdates)]
+  ];
+  const paint=()=>{
+   const query=search.value.trim().toLowerCase();
+   list.replaceChildren();
+   for(const [label,fn] of items){
+    if(query&&!label.toLowerCase().includes(query))continue;
+    const b=E('button',label);b.type='button';b.onclick=fn;list.append(b);
+   }
+   if(!list.childElementCount)list.append(E('p','No matching features'));
+  };
+  search.oninput=paint;paint();body.append(search,list);
+ }
  function activate(id){for(const b of bar.querySelectorAll('button')){const on=b.dataset.tab===id;b.classList.toggle('is-current',on);if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');}}
  function tab(id,label,icon,fn,{action=false}={}){
   const b=E('button');b.type='button';b.className='mobile-tab';b.dataset.tab=id;
@@ -81,24 +124,24 @@ export async function mountMobileChrome(){
   bar.append(b);
  }
  const scrollTo=sel=>document.querySelector(sel)?.scrollIntoView({behavior:'smooth',block:'start'});
- if(document.querySelector('.arrangement')){
-  tab('studio','Studio',icons.studio,()=>scrollTo('.arrangement'));
+ if(arrangement){
+  tab('arrange','Arrange',icons.arrange,()=>scrollTo('.arrangement'));
   tab('tracks','Tracks',icons.tracks,()=>scrollTo('.track-library'));
-  tab('record','Record',icons.record,()=>document.getElementById('record')?.click(),{action:true});
   tab('mix','Mix',icons.mix,()=>{const b=document.getElementById('core3Mixer');if(b)b.click();else scrollTo('.inspector');});
-  tab('producer','Producer',icons.producer,()=>{const b=document.getElementById('core5Producer');if(b)b.click();else scrollTo('.inspector');});
-  activate('studio');
+  tab('tune','Tune',icons.tune,()=>clickStage(4));
+  tab('more','More',icons.more,()=>openFeatures(),{action:true});
+  activate('arrange');
  }else{
   tab('arrange','Arrange',icons.arrange,()=>scrollTo('.panel.arrange'));
-  tab('sound','Sound',icons.sound,()=>scrollTo('.panel.sound'));
-  tab('timing','Timing',icons.timing,()=>scrollTo('.panel.timing'));
-  tab('record','Record',icons.record,()=>document.getElementById('record')?.click(),{action:true});
+  tab('tune','Tune',icons.tune,()=>scrollTo('.panel.sound'));
+  tab('mix','Mix',icons.mix,()=>scrollTo(document.querySelector('.mixbox')?'.mixbox':'.panel'));
   tab('export','Export',icons.export,()=>scrollTo('.panel.export'));
+  tab('more','More',icons.more,()=>openFeatures(),{action:true});
   activate('arrange');
  }
  document.body.append(bar);
  const recordButton=document.getElementById('record');
- const markRecording=()=>bar.querySelector('[data-tab="record"]')?.classList.toggle('is-recording',!!recordButton?.classList.contains('active'));
+ const markRecording=()=>bar.querySelector('[data-tab="more"]')?.classList.toggle('is-recording',!!recordButton?.classList.contains('active'));
  if(recordButton)new MutationObserver(markRecording).observe(recordButton,{attributes:true,attributeFilter:['class']});
  function workspaceReady(){
   const studio=document.getElementById('appShell');

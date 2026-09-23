@@ -1,0 +1,19 @@
+/* Paste/merge into mobile-src/mobile.css — house zinc+indigo */
+:root{
+  --bg:#09090B;--surface:#111113;--elev:#18181B;--elev-2:#1C1C1F;
+  --border:#27272A;--border-strong:#3F3F46;--text:#FAFAFA;--muted:#A1A1AA;--faint:#71717A;
+  --accent:#6E79D6;--accent-hover:#828FFF;--accent-muted:color-mix(in srgb,var(--accent) 16%,transparent);
+  --danger:#EF4444;--on-accent:#fff;--radius:10px;--radius-lg:14px;--touch:44px;
+  --iv-safe-top:env(safe-area-inset-top,0px);--iv-safe-right:env(safe-area-inset-right,0px);
+  --iv-safe-bottom:env(safe-area-inset-bottom,0px);--iv-safe-left:env(safe-area-inset-left,0px);
+  touch-action:manipulation;
+  --font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font);overscroll-behavior:none;-webkit-text-size-adjust:100%;min-height:100%}
+button,input,select,textarea{font-size:16px;min-height:var(--touch)}
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.mobile-tabbar{background:color-mix(in srgb,var(--surface) 94%,transparent);border-top:1px solid var(--border)}
+.mobile-tabbar button{color:var(--faint);border-radius:8px}
+.mobile-tabbar button.active,.mobile-tabbar button[aria-current=page]{color:var(--text);background:var(--accent-muted)}
+.app-header,.mobile-classic-top{background:color-mix(in srgb,var(--surface) 92%,transparent);border-bottom:1px solid var(--border)}
+.transport{background:var(--surface);border-bottom:1px solid var(--border)}

@@ -432,9 +432,17 @@ export async function mountCreate({shell, config}) {
   function openMore() {
     const items = [
       ['Guided tour', () => { moreDialog.close(); coachSkipped = false; openCoach(0); }],
+      ['Record', () => { moreDialog.close(); setMode('studio'); document.getElementById('record')?.click(); }],
       ['Producer', () => { moreDialog.close(); openAdvanced('producer'); }],
+      ['GRIM rack', () => { moreDialog.close(); openAdvanced('producer'); }],
+      ['Precision Tune', () => { moreDialog.close(); openAdvanced('tune'); }],
+      ['Pocket', () => { moreDialog.close(); openAdvanced('beat'); }],
       ['Plugins', () => { moreDialog.close(); setMode('studio'); document.getElementById('pluginsTab')?.click(); }],
       ['Release & connect', () => { moreDialog.close(); setMode('studio'); document.getElementById('integrationsTab')?.click(); }],
+      ['AI tools', () => { moreDialog.close(); setMode('studio'); document.getElementById('aiTab')?.click(); }],
+      ['Mastering', () => { moreDialog.close(); openAdvanced('master'); }],
+      ['Export', () => { moreDialog.close(); openAdvanced('export'); }],
+      ['Tutorial', () => { moreDialog.close(); setMode('studio'); document.getElementById('tutorial')?.click(); }],
       ['Saved projects', () => { moreDialog.close(); setMode('studio'); document.getElementById('openSaved')?.click(); }],
       [arrangement() ? 'Classic Studio' : 'Arrangement Studio', () => { location.href = arrangement() ? 'lab/index.html' : '../studio.html'; }],
       ['Subscribe', () => { moreDialog.close(); setMode('create'); showView('subscribe'); }]
@@ -449,13 +457,28 @@ export async function mountCreate({shell, config}) {
     close.onclick = () => moreDialog.close();
     head.append(close);
     const body = E('div');
-    body.className = 'mobile-native-body iv-more-list';
-    for (const [label, fn] of items) {
-      const button = E('button', label);
-      button.type = 'button';
-      button.onclick = fn;
-      body.append(button);
-    }
+    body.className = 'mobile-native-body';
+    const search = E('input');
+    search.type = 'search';
+    search.placeholder = 'Search features';
+    search.setAttribute('aria-label', 'Search features');
+    const list = E('div');
+    list.className = 'iv-more-list';
+    const paint = () => {
+      const query = search.value.trim().toLowerCase();
+      list.replaceChildren();
+      for (const [label, fn] of items) {
+        if (query && !label.toLowerCase().includes(query)) continue;
+        const button = E('button', label);
+        button.type = 'button';
+        button.onclick = fn;
+        list.append(button);
+      }
+      if (!list.childElementCount) list.append(E('p', 'No matching features'));
+    };
+    search.oninput = paint;
+    paint();
+    body.append(search, list);
     moreDialog.append(head, body);
     if (!moreDialog.open) moreDialog.showModal();
   }

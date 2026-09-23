@@ -19,3 +19,15 @@
 | Host switching | HTTPS-only Mobile Settings | HTTPS-only Mobile Settings |
 | Windows self-updater | Replaced by App Store updates | Replaced by Google Play updates |
 | Unreleased Core 6 collaboration | Not bootstrapped in Core 5 store build | Not bootstrapped in Core 5 store build |
+
+## Intentional deltas
+
+Cap embeds the same Core 5 `build:web` payload as the browser. These are I/O and policy gaps, not a second FX stack. The Ultimate lab rebuild is not the parity source.
+
+- Native share, with a 256 MB per-file export cap
+- Plugin allowlist: preset JSON only; arbitrary JS/WASM plugins are rejected
+- Store updates only (no in-app web updater)
+- Core 6 collaboration is not bootstrapped
+- No Stripe purchase CTAs on iOS or Android until StoreKit / Play Billing is wired
+
+See `docs/STUDY-infectedvoices-parity.md` and `docs/UI-mobile-chrome.md`.
