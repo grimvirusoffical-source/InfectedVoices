@@ -38,8 +38,11 @@ jobs:
           grep -q 'usesCleartextTraffic="false"' android/app/src/main/AndroidManifest.xml
           grep -q 'android:scheme="infectedvoices"' android/app/src/main/AndroidManifest.xml
           grep -q 'targetSdkVersion = 36' android/variables.gradle
-          test -f android/app/src/main/assets/public/studio.html
-          grep -q 'mobile-entry.js' android/app/src/main/assets/public/studio.html
+          test -f android/app/src/main/assets/public/index.html
+          grep -q 'content="0.7.0"' android/app/src/main/assets/public/index.html
+          grep -q 'native-bridge.js' android/app/src/main/assets/public/index.html
+          test -f android/app/src/main/assets/public/arrangement/studio.html
+          grep -q 'mobile-entry.js' android/app/src/main/assets/public/arrangement/studio.html
           test -f android/app/build/outputs/bundle/release/app-release.aab
       - name: Package Android Studio handoff
         run: |

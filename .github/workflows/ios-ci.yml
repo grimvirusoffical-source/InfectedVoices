@@ -36,9 +36,12 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$APP/Info.plist"
           find "$APP" -name PrivacyInfo.xcprivacy -print -quit | grep PrivacyInfo.xcprivacy
-          test -f "$APP/public/studio.html"
-          grep -q 'mobile-entry.js' "$APP/public/studio.html"
-          grep -q 'mobile.css' "$APP/public/studio.html"
+          test -f "$APP/public/index.html"
+          grep -q 'content="0.7.0"' "$APP/public/index.html"
+          grep -q 'native-bridge.js' "$APP/public/index.html"
+          test -f "$APP/public/arrangement/studio.html"
+          grep -q 'mobile-entry.js' "$APP/public/arrangement/studio.html"
+          grep -q 'mobile.css' "$APP/public/arrangement/studio.html"
       - name: Package Mac/Xcode handoff
         run: |
           ditto -c -k --sequesterRsrc --keepParent ios InfectedVoices-iOS-Xcode-Project.zip

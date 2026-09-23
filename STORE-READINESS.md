@@ -1,6 +1,6 @@
 # iOS App Store readiness
 
-The iOS project is prepared to build and archive as a native iOS/iPadOS application. A public App Store release still depends on items that can only be completed in your Apple Developer / production-server accounts.
+The iOS project packages Studio 0.7.0 plus the Core 5 arrangement surface and is prepared to build and archive as a native iOS/iPadOS application. A public App Store release still depends on items that can only be completed in your Apple Developer / production-server accounts.
 
 ## Required account-side items
 
@@ -18,5 +18,5 @@ The iOS project is prepared to build and archive as a native iOS/iPadOS applicat
 - Exports use the iOS share/document flow; broad photo/storage permissions are not requested.
 - Microphone access has an explicit purpose string.
 - Studio plugins are declarative preset JSON only; arbitrary JavaScript/WASM plugins are rejected.
-- The mobile store bootstrap is Core 5 only.
+- The home screen is Studio 0.7.0. Core 5 Arrangement remains inside the same bundle. Unreleased Core 6 collaboration is not bootstrapped.
 - `PrivacyInfo.xcprivacy` declares linked account/audio data used for app functionality and declares no tracking.
