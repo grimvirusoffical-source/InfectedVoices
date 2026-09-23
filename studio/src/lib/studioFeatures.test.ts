@@ -7,6 +7,7 @@ import { loopRangeFromBars } from './transport.ts'
 import { estimateKey } from './keyEstimate.ts'
 import { REDX_INSTALL_COMMAND, VOCAL_LAB_V040 } from '../releases.ts'
 import { formatDeliveryNote, measureDelivery } from './delivery.ts'
+import { can, resolveTier, startTrial } from './plan.ts'
 
 test('scale snap holds a concert A in A major', () => {
   const shift = snapSemitones(440, 'A', 'major', 8)
@@ -79,4 +80,20 @@ test('delivery note measures a half-scale sine instead of inventing loudness', (
   assert.match(note, /Delivery note: integrated .+ LUFS/)
   assert.match(note, /true peak .+ dBTP/)
   assert.match(note, /48000 Hz · 16-bit · 140 BPM/)
+})
+
+test('a 7-day trial expires back to Free and does not repeat', () => {
+  const future = Date.now() + 60 * 60 * 1000
+  const past = Date.now() - 60 * 60 * 1000
+  assert.equal(resolveTier({ trialPlan: 'pro', trialEndsAt: future }), 'pro')
+  assert.equal(resolveTier({ trialPlan: 'pro', trialEndsAt: past }), 'free')
+  assert.equal(resolveTier({ studioPlan: 'basic', trialPlan: 'pro', trialEndsAt: past }), 'basic')
+  assert.equal(can('basic', 'stems'), false)
+  assert.equal(can('pro', 'stems'), true)
+  const account = 'studio-trial-test'
+  assert.equal(startTrial('basic', account).ok, true)
+  assert.equal(startTrial('basic', account).ok, false)
+  assert.equal(resolveTier({ account }), 'basic')
+  assert.equal(can(resolveTier({ account }), 'project_lab'), true)
+  assert.equal(can(resolveTier({ account }), 'stems'), false)
 })

@@ -138,7 +138,8 @@ async function api(req,url){
   }
   if(path==="/api/billing/checkout"&&req.method==="POST"){
     const found=await requireAccount(req);if("error" in found)return found.error;
-    const result=await nation("/api/v1/billing/stripe/checkout",{token:found.token,appId:APP_ID});
+    const trialDays=Math.max(0,Number(process.env.IV_STRIPE_TRIAL_DAYS||7));
+    const result=await nation("/api/v1/billing/stripe/checkout",{token:found.token,appId:APP_ID,trialPeriodDays:trialDays,trial_period_days:trialDays});
     return json(req,result.data,result.status);
   }
   if(path==="/api/activity"&&req.method==="POST"){

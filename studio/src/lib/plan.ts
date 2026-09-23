@@ -1,4 +1,4 @@
-/** Mirrors mobile-src/entitlements.js. Signed-in is Free. Nation social plans are not studio plans. */
+/** Mirrors mobile-src/entitlements.js. Signed-in is Free. A trial lasts until trialEndsAt. */
 
 export const BASIC_PLUS = [
   'precision_tune', 'precision_pocket', 'grim_rack',
@@ -41,6 +41,8 @@ const ALIAS: Record<string, string> = {
 }
 
 const NATION_SOCIAL = new Set(['infectious', 'plague'])
+const TRIAL_MS = 7 * 24 * 60 * 60 * 1000
+const memory = new Map<string, string>()
 
 export type StudioPlan = 'free' | 'basic' | 'pro'
 
@@ -50,7 +52,18 @@ type Signal = {
   studioPlan?: string
   nationPlan?: string
   socialPlan?: string
-  demoPlan?: string
+  account?: string
+  trialPlan?: string
+  trialEndsAt?: string | number
+  basicTrialUsed?: boolean
+  proTrialUsed?: boolean
+}
+
+type TrialRecord = {
+  basicUsed: boolean
+  proUsed: boolean
+  basicEndsAt: number
+  proEndsAt: number
 }
 
 export function entitlementKey(id: string) {
@@ -74,24 +87,73 @@ export function planFromAccess(access: Signal = {}): StudioPlan {
   return 'free'
 }
 
-export function readDemoPlan(): StudioPlan | '' {
+function storageGet(key: string) {
   try {
-    const value = localStorage.getItem('iv-studio-demo-plan')
-    if (value === 'basic' || value === 'pro' || value === 'free') return value
+    return localStorage.getItem(key)
   } catch {
-    /* storage unavailable */
+    return memory.has(key) ? memory.get(key)! : null
   }
-  return ''
 }
 
-/** Server studioPlan wins. The QA demo flip is the only client plan write. */
-export function resolveTier(signal: Signal = {}): StudioPlan {
-  const server = planFromAccess(signal)
-  if (server === 'basic' || server === 'pro') return server
-  if (signal.demoPlan === 'basic' || signal.demoPlan === 'pro') return signal.demoPlan
-  const demo = readDemoPlan()
-  if (demo === 'basic' || demo === 'pro') return demo
-  return 'free'
+function storageSet(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    memory.set(key, value)
+  }
+}
+
+function stamp(value: unknown) {
+  if (value == null || value === '' || value === false) return 0
+  const parsed = typeof value === 'number' ? value : Date.parse(String(value))
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
+}
+
+function emptyTrial(): TrialRecord {
+  return { basicUsed: false, proUsed: false, basicEndsAt: 0, proEndsAt: 0 }
+}
+
+function trialAccount() {
+  return storageGet('iv-active-account') || 'device'
+}
+
+function readTrial(account = trialAccount()): TrialRecord {
+  try {
+    const raw = JSON.parse(storageGet('iv-studio-trial:' + account) || 'null') as TrialRecord | null
+    if (!raw || typeof raw !== 'object') return emptyTrial()
+    return {
+      basicUsed: raw.basicUsed === true,
+      proUsed: raw.proUsed === true,
+      basicEndsAt: stamp(raw.basicEndsAt),
+      proEndsAt: stamp(raw.proEndsAt),
+    }
+  } catch {
+    return emptyTrial()
+  }
+}
+
+function rank(plan: string) {
+  if (plan === 'pro') return 2
+  if (plan === 'basic') return 1
+  return 0
+}
+
+function higher(a: string, b: string): StudioPlan {
+  const winner = rank(a) >= rank(b) ? a : b
+  return winner === 'basic' || winner === 'pro' ? winner : 'free'
+}
+
+/** Paid studioPlan is the floor. An active trialEndsAt can sit above it until that stamp. */
+export function resolveTier(signal: Signal = {}, now = Date.now()): StudioPlan {
+  const local = readTrial(signal.account || trialAccount())
+  const serverPlan = signal.trialPlan === 'basic' || signal.trialPlan === 'pro' ? signal.trialPlan : ''
+  const serverEnds = stamp(signal.trialEndsAt)
+  const basicEndsAt = Math.max(local.basicEndsAt, serverPlan === 'basic' ? serverEnds : 0)
+  const proEndsAt = Math.max(local.proEndsAt, serverPlan === 'pro' ? serverEnds : 0)
+  const trialPlan = proEndsAt > now ? 'pro' : basicEndsAt > now ? 'basic' : ''
+  const paid = planFromAccess(signal)
+  const floor = paid === 'basic' || paid === 'pro' ? paid : ''
+  return higher(floor, trialPlan)
 }
 
 export function canUse(featureId: string, signal: Signal = {}) {
@@ -99,8 +161,7 @@ export function canUse(featureId: string, signal: Signal = {}) {
 }
 
 export function readClientSignal(): Signal {
-  const demo = readDemoPlan()
-  return demo ? { demoPlan: demo } : {}
+  return { account: trialAccount() }
 }
 
 export function sessionTier() {
@@ -109,4 +170,23 @@ export function sessionTier() {
 
 export function sessionCan(featureId: string) {
   return can(sessionTier(), featureId)
+}
+
+export function startTrial(kind: 'basic' | 'pro', account = trialAccount(), now = Date.now()) {
+  const record = readTrial(account)
+  if (kind === 'basic' && record.basicUsed) return { ok: false as const, reason: 'used' }
+  if (kind === 'pro' && record.proUsed) return { ok: false as const, reason: 'used' }
+  const ends = now + TRIAL_MS
+  const next = {
+    basicUsed: kind === 'basic' ? true : record.basicUsed,
+    proUsed: kind === 'pro' ? true : record.proUsed,
+    basicEndsAt: kind === 'basic' ? ends : record.basicEndsAt,
+    proEndsAt: kind === 'pro' ? ends : record.proEndsAt,
+  }
+  storageSet('iv-studio-trial:' + account, JSON.stringify({
+    plan: next.proEndsAt >= next.basicEndsAt && next.proEndsAt ? 'pro' : next.basicEndsAt ? 'basic' : 'free',
+    trialEndsAt: Math.max(next.basicEndsAt || 0, next.proEndsAt || 0) || null,
+    ...next,
+  }))
+  return { ok: true as const, ends }
 }

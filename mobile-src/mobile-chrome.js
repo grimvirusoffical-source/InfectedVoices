@@ -265,5 +265,6 @@ export async function mountMobileChrome(){
   await mountCreate({shell,config});
   window.ivOpenNativeUpdates=showUpdates;
   window.ivOpenNativeStore=showStore;
+  window.ivStartStoreTrial=kind=>shell.purchaseSubscription(kind,'trial');
   return {updates:showUpdates,settings:showSettings,store:showStore};
 }

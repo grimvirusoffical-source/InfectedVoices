@@ -90,7 +90,7 @@ Source of truth: `docs/STUDY-infectedvoices-pricing.md`.
 Free’s local InfectedTune and Pocket cards do not get a lock icon. Smart Mix + Master stays visible and locks on Free.
 
 ### Lock sheet
-Basic gates use “Unlock with Basic” and “Get Basic — $20”. Pro gates use “Unlock with Pro” and “Get Pro — $40”. Maybe later stays. Activate Basic / Activate Pro is the QA plan flip until store products are live. Cap has no Stripe button and no “Pro on web/desktop” link.
+Basic gates use “Unlock with Basic” and “Get Basic — $20”. Pro gates use “Unlock with Pro” and “Get Pro — $40”. Maybe later stays. Subscribe cards are Free (current), Basic (Subscribe $20 and Start 7-day Basic trial), and Pro (Subscribe $40 and Start 7-day Pro trial). Copy: “7 days of Basic / Pro — then Free unless you subscribe.” An active trial shows its end date. Each trial is once per account. Cap has no Stripe button and no “Pro on web/desktop” link.
 
 ### Subscribe screen
 Three cards: Free, Basic $20, Pro $40. Current plan is disabled. Free has no in-app product. Purchase buttons open the store sheet, and that sheet shows a buy button only when the catalog returns the product.

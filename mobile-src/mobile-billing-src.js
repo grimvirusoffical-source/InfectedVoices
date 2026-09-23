@@ -41,6 +41,28 @@ function matchProduct(list, platform, id){
 function describe(product, id, title){
   return {productId:id, title:product?.title||title, price:product?.priceString||'', available:!!product};
 }
+function phaseIsFree(phase){
+  if(!phase||typeof phase!=='object')return false;
+  const mode=String(phase.paymentMode||phase.recurrenceMode||'');
+  if(mode==='freeTrial'||mode==='FREE_TRIAL')return true;
+  if(phase.price===0||phase.priceAmountMicros===0||phase.priceMicros===0)return true;
+  const label=String(phase.priceString||phase.formattedPrice||'').toLowerCase();
+  return label==='free'||label.startsWith('free ');
+}
+function freeTrialOffer(product){
+  if(!product)return null;
+  const intro=product.introductoryPrice||product.introPrice;
+  if(intro&&(intro.paymentMode==='freeTrial'||intro.price===0||phaseIsFree(intro)))return {token:''};
+  const groups=[].concat(product.subscriptionOffers||[], product.offers||[], product.subscriptionOfferDetails||[]);
+  for(const offer of groups){
+    const phases=offer?.pricingPhases||offer?.pricingPhaseList||[];
+    const free=(Array.isArray(phases)?phases:[]).some(phaseIsFree)||phaseIsFree(offer);
+    if(!free)continue;
+    const token=offer.offerToken||offer.token||'';
+    return {token:token?String(token):''};
+  }
+  return null;
+}
 
 export function createStoreBilling(nation){
   async function support(){
@@ -109,22 +131,27 @@ export function createStoreBilling(nation){
     }
     return result;
   }
-  async function purchase(tier){
+  async function purchase(tier, mode){
     const plan=tier==='basic'?'basic':'pro';
+    const trial=mode==='trial';
     const user=await account();
     if(!(await support()))throw Error('Store billing is not available on this device.');
     const platform=currentPlatform();
     const id=idsFor(platform)[plan];
     const {list}=await loadProducts();
-    if(!matchProduct(list, platform, id))throw Error((plan==='basic'?'Basic':'Pro')+' is not on this device yet.');
+    const product=matchProduct(list, platform, id);
+    if(!product)throw Error((plan==='basic'?'Basic':'Pro')+' is not on this device yet.');
+    const offer=trial?freeTrialOffer(product):null;
+    if(trial&&!offer)throw Error('Store trial is not on this device yet.');
     const tx=await NativePurchases.purchaseProduct({
       productIdentifier:id,
       productType:PURCHASE_TYPE.SUBS,
       appAccountToken:await stableUuid(user.accountId),
       autoAcknowledgePurchases:false,
-      ...(platform==='android'?{planIdentifier:ANDROID_BASE_PLAN_ID}:{})
+      ...(platform==='android'?{planIdentifier:ANDROID_BASE_PLAN_ID}:{}),
+      ...(offer?.token?{offerToken:offer.token}:{})
     });
-    return verify(tx,'purchase');
+    return verify(tx, trial?'trial':'purchase');
   }
   async function restore(){
     await account();

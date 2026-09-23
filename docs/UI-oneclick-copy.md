@@ -19,6 +19,14 @@
 
 ## Lock sheet
 - Title: “Unlock with Pro” or “Unlock with Basic”
-- Body template: “{feature} is included in Pro $40.” or “{feature} is included in Basic $20.”
-- Primary: “Get Pro — $40”
+- Body template: “{feature} — Included in Pro $40.” or “{feature} — Included in Basic $20.”
+- Primary: “Get Pro — $40” or “Get Basic — $20”
+- Trial: “Start 7-day Basic trial” or “Start 7-day Pro trial”
+- Copy: “7 days of Basic — then Free unless you subscribe.” or “7 days of Pro — then Free unless you subscribe.”
 - Ghost: “Maybe later”
+
+## Subscribe cards
+- Free — current plan. Free is not a trial.
+- Basic — “Subscribe $20” and “Start 7-day Basic trial”
+- Pro — “Subscribe $40” and “Start 7-day Pro trial”
+- An active trial shows “Trial ends” plus the calendar date. It does not stay Pro after that date.

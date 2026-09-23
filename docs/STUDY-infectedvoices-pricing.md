@@ -113,7 +113,7 @@ No IAP for Free. Cap: StoreKit/Play only (no Stripe CTA). Web/Windows: Stripe.
 
 ## Trial / demo
 
-Free **is** the ongoing free tier — no need for a crippled demo mode. Optional: 7-day PRO trial once per store account later. Until IAP live, everyone on Free + in-app “Activate Basic/Pro” demo flip for QA (same `plan` field).
+Free **is** the ongoing free tier — it is not a trial, and a bare demo flag does not unlock Pro. Each account can start one 7-day Basic trial (BASIC_PLUS) and one 7-day Pro trial (full PRO). After `trialEndsAt` the account returns to Free, or to the paid plan already on the account. Cap uses the store intro offer when the product advertises one. Until IAP is live, client and server `trialEndsAt` is the QA path. Web and Windows Checkout sends `trial_period_days` when the Stripe prices exist.
 
 ## Stress checks
 

@@ -1,4 +1,4 @@
-import {PRO_FEATURES, BASIC_FEATURES, BASIC_PLUS, canUse, entitlementKey, featureById, lockBody, resolveTier, setDemoPlan} from './entitlements.js';
+import {PRO_FEATURES, BASIC_FEATURES, BASIC_PLUS, TRIAL_COPY, TRIAL_CTA, accessState, canUse, entitlementKey, featureById, formatTrialEnd, lockBody, startTrial} from './entitlements.js';
 
 const COACH = [
   {id:'prepare', view:'home', title:'Prepare', body:'Import a beat to set the grid and BPM. Lead, beat, and bus stay available in Studio.', cta:'Import a beat', run:'prepareSong'},
@@ -126,15 +126,38 @@ export async function mountCreate({shell, config}) {
   function signal() {
     const user = window.ivStudioBridge?.currentUser?.() || {};
     const studio = String(user.studioPlan || '').toLowerCase();
+    const trialPlan = String(user.trialPlan || '').toLowerCase();
     return {
+      account: accountKey,
       studioPlan: studio === 'free' || studio === 'basic' || studio === 'pro' ? studio : undefined,
       kind: user.kind,
-      nationPlan: user.nationPlan
+      nationPlan: user.nationPlan,
+      trialPlan: trialPlan === 'basic' || trialPlan === 'pro' ? trialPlan : undefined,
+      trialEndsAt: user.trialEndsAt,
+      basicTrialUsed: user.basicTrialUsed === true,
+      proTrialUsed: user.proTrialUsed === true
     };
   }
-  function tier() { return resolveTier(signal()); }
-  function activate(plan) {
-    setDemoPlan(plan);
+  function access() { return accessState(signal()); }
+  function tier() { return access().tier; }
+  function storeTrialMissing(error) {
+    return /not on this device|not available on this device/i.test(String(error?.message || error || ''));
+  }
+  async function beginTrial(kind) {
+    if (capStore && typeof window.ivStartStoreTrial === 'function') {
+      try {
+        await window.ivStartStoreTrial(kind);
+        render();
+        return;
+      } catch (error) {
+        if (!storeTrialMissing(error)) {
+          alert(error?.message || 'The store trial could not start.');
+          return;
+        }
+      }
+    }
+    const started = startTrial(kind, accountKey);
+    if (!started.ok) alert('Trial already used');
     render();
   }
   function allowed(featureId) { return canUse(featureId, signal()); }
@@ -497,12 +520,15 @@ export async function mountCreate({shell, config}) {
     };
     actions.append(buy);
     const paid = basicGate ? 'basic' : 'pro';
-    if (tier() !== 'pro' && tier() !== paid) {
-      const demo = E('button', basicGate ? 'Activate Basic' : 'Activate Pro');
-      demo.type = 'button';
-      demo.className = 'ghost';
-      demo.onclick = () => { lock.close(); activate(paid); };
-      actions.append(demo);
+    const state = access();
+    if (state.tier !== 'pro' && state.tier !== paid) {
+      const used = paid === 'basic' ? state.basicUsed : state.proUsed;
+      const trial = E('button', used ? 'Trial already used' : TRIAL_CTA[paid]);
+      trial.type = 'button';
+      trial.className = 'ghost';
+      trial.disabled = used;
+      trial.onclick = () => { lock.close(); beginTrial(paid); };
+      actions.append(trial, E('p', TRIAL_COPY[paid]));
     }
     const later = E('button', 'Maybe later');
     later.type = 'button';
@@ -764,9 +790,10 @@ export async function mountCreate({shell, config}) {
     return screen;
   }
   function planCard(id, title, price, lines) {
-    const current = tier() === id;
+    const state = access();
+    const current = state.tier === id;
     const article = E('article');
-    article.className = 'iv-plan' + (id === 'basic' ? ' is-raised' : '') + (id === 'pro' && tier() !== 'pro' ? ' is-featured' : '');
+    article.className = 'iv-plan' + (id === 'basic' ? ' is-raised' : '') + (id === 'pro' && state.tier !== 'pro' ? ' is-featured' : '');
     article.append(E('h3', title), E('p', price));
     const list = E('ul');
     for (const line of lines) list.append(E('li', line));
@@ -776,12 +803,15 @@ export async function mountCreate({shell, config}) {
       button.type = 'button';
       button.disabled = true;
       article.append(button);
-    } else if (id === 'pro') {
-      article.append(purchaseButton('Get Pro — $40', 'pro'));
-      article.append(activateButton('Activate Pro', 'pro'));
-    } else if (id === 'basic' && tier() !== 'pro') {
-      article.append(purchaseButton('Get Basic — $20', 'basic'));
-      article.append(activateButton('Activate Basic', 'basic'));
+      if (state.trialPlan === id && state.trialEndsAt) {
+        article.append(E('p', 'Trial ends ' + formatTrialEnd(state.trialEndsAt)));
+        article.append(E('p', TRIAL_COPY[id]));
+      } else if (id === 'free') {
+        article.append(E('p', 'Free stays on this account. It is not a trial.'));
+      }
+    } else if (id === 'pro' || (id === 'basic' && state.tier !== 'pro')) {
+      article.append(purchaseButton(id === 'pro' ? 'Subscribe $40' : 'Subscribe $20', id));
+      article.append(trialOffer(id, state));
     }
     return article;
   }
@@ -792,12 +822,16 @@ export async function mountCreate({shell, config}) {
     button.onclick = () => capStore ? openStore(plan) : showView('subscribe');
     return button;
   }
-  function activateButton(label, plan) {
-    const button = E('button', label);
+  function trialOffer(kind, state) {
+    const used = kind === 'basic' ? state.basicUsed : state.proUsed;
+    const wrap = E('div');
+    const button = E('button', used ? 'Trial already used' : TRIAL_CTA[kind]);
     button.type = 'button';
     button.className = 'ghost iv-wide';
-    button.onclick = () => activate(plan);
-    return button;
+    button.disabled = used;
+    button.onclick = () => beginTrial(kind);
+    wrap.append(button, E('p', TRIAL_COPY[kind]));
+    return wrap;
   }
 
   function openCoach(step) {
