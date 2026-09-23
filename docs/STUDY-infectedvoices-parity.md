@@ -28,7 +28,7 @@ Core 5 audio engine is intentionally shared. Gaps are mostly **I/O, permissions,
 | Pocket / Precision Pocket | ✓ | ✓ | ✓ | ✓ | — |
 | Mixer / buses / EQ / comp / delay / reverb | ✓ | ✓ | ✓ | ✓ | — |
 | Core 5 automation / sidechain | ✓ | ✓ | ✓ | ✓ | — |
-| GRIM character rack | ✓ | ✓ | ✓ | ✓ | — |
+| GRIM character rack | ✓ | ✓ | Basic+ | Basic+ | Free does not unlock GRIM, Precision, Core 5, 24-bit, Smart Mix, or Project Lab |
 | LUFS / true-peak mastering | ✓ | ✓ | ✓ | ✓ | CPU heavier on low-end phones — profile |
 | Export WAV / stems / project ZIP | Desktop save dialog | Download / File System Access | Native **share/document**; **256 MB/file cap** | Same share + **256 MB cap** | Large projects: split stems or warn under cap |
 | Classic Studio / **MP3** (`lamejs`) | ✓ | ✓ | ✓ | ✓ | Keep `@breezystack/lamejs` in Cap deps |
@@ -37,7 +37,7 @@ Core 5 audio engine is intentionally shared. Gaps are mostly **I/O, permissions,
 | Account / access | Desktop account | HTTPS identity | Keychain session + HTTPS allowlist | Encrypted prefs + HTTPS | No cleartext; host switch HTTPS-only |
 | Collaboration (Core 6) | In the 0.6.6-core6.1 vendor | Files in `dist/`; browser may keep collab | **Not bootstrapped.** Optional flag off | **Not bootstrapped.** Optional flag off | Store build rebrands the pilot and does not import it |
 | Self-updater | Windows updater | Service worker / host deploy | **App Store only** — no sideload studio JS | **Play only** | Do not reintroduce web updater in Cap |
-| Payments in-app | Stripe OK on web/desktop | Stripe OK on the browser host | Studio Plus via StoreKit. No Stripe button | Studio Plus via Play Billing. No Stripe button | Product `infectedvoices.studio.monthly` |
+| Payments in-app | Stripe OK on web/desktop | Stripe OK on the browser host | Studio Plus via StoreKit. No Stripe button. Verified receipt is Pro | Studio Plus via Play Billing. No Stripe button. Verified receipt is Pro | Product `infectedvoices.studio.monthly`. Signed-in is Free until Basic, Pro, or a 7-day trial |
 | Deep link studio | n/a | URL | `infectedvoices://studio` | same | Validated by app bridge |
 | Background / audio session | Full | Browser suspend risk | Needs AVAudioSession QA | Needs AudioFocus QA | Real device only |
 

@@ -1,10 +1,24 @@
 import { Mp3Encoder } from '@breezystack/lamejs'
 
-export async function audioBufferToWav(buffer: AudioBuffer): Promise<Blob> {
+export type WavBits = 16 | 24
+
+/** Free stays 16-bit. Basic and Pro default to 48 kHz / 24-bit. */
+export function exportSpec(tier: string): { sampleRate: number; bits: WavBits; label: string } {
+  if (tier === 'basic' || tier === 'pro') return { sampleRate: 48000, bits: 24, label: '48 kHz · 24-bit WAV' }
+  return { sampleRate: 44100, bits: 16, label: '16-bit WAV' }
+}
+
+export async function exportMasterWav(buffer: AudioBuffer, tier: string): Promise<{ blob: Blob; label: string }> {
+  const spec = exportSpec(tier)
+  const matched = await matchSampleRate(buffer, spec.sampleRate)
+  return { blob: await audioBufferToWav(matched, spec.bits), label: spec.label }
+}
+
+export async function audioBufferToWav(buffer: AudioBuffer, bits: WavBits = 16): Promise<Blob> {
   const numChannels = buffer.numberOfChannels
   const sampleRate = buffer.sampleRate
   const format = 1
-  const bitDepth = 24
+  const bitDepth = bits
   const bytesPerSample = bitDepth / 8
   const blockAlign = numChannels * bytesPerSample
   const dataLength = buffer.length * blockAlign
@@ -33,12 +47,18 @@ export async function audioBufferToWav(buffer: AudioBuffer): Promise<Blob> {
   for (let i = 0; i < buffer.length; i++) {
     for (let c = 0; c < numChannels; c++) {
       let sample = Math.max(-1, Math.min(1, channels[c][i]))
-      sample = sample < 0 ? sample * 0x800000 : sample * 0x7fffff
-      const intSample = Math.round(sample)
-      view.setUint8(offset, intSample & 0xff)
-      view.setUint8(offset + 1, (intSample >> 8) & 0xff)
-      view.setUint8(offset + 2, (intSample >> 16) & 0xff)
-      offset += 3
+      if (bitDepth === 16) {
+        sample = sample < 0 ? sample * 0x8000 : sample * 0x7fff
+        view.setInt16(offset, Math.round(sample), true)
+        offset += 2
+      } else {
+        sample = sample < 0 ? sample * 0x800000 : sample * 0x7fffff
+        const intSample = Math.round(sample)
+        view.setUint8(offset, intSample & 0xff)
+        view.setUint8(offset + 1, (intSample >> 8) & 0xff)
+        view.setUint8(offset + 2, (intSample >> 16) & 0xff)
+        offset += 3
+      }
     }
   }
   return new Blob([arrayBuffer], { type: 'audio/wav' })

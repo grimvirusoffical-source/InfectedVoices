@@ -100,4 +100,9 @@ if(!indexText.includes('content="0.7.0"'))throw Error('Canonical studio was not 
 for(const required of ['index.html','studio.html','api.js','workstation/app.js','lab/index.html','lab/account-entry.js','favicon.svg','manifest.webmanifest']){
   await fs.access(path.join(out,required));
 }
+const downloadPage=path.join(root,'download','index.html');
+await fs.mkdir(path.join(out,'get'),{recursive:true});
+await fs.mkdir(path.join(out,'download'),{recursive:true});
+await fs.copyFile(downloadPage,path.join(out,'get','index.html'));
+await fs.copyFile(downloadPage,path.join(out,'download','index.html'));
 console.log('Prepared Infected Voices browser payload in browser-dist/');

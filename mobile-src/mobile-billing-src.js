@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
+import { rememberStudioPlus } from './entitlements.js';
 
 export const STORE_PRODUCT_ID='infectedvoices.studio.monthly';
 export const ANDROID_BASE_PLAN_ID='monthly';
@@ -71,6 +72,7 @@ export function createStoreBilling(nation){
     };
     const result=await nation.post('/api/v1/billing/mobile/verify',payload);
     if(!(result?.allowed||result?.verified))throw Error(result?.error||'The store purchase could not be verified.');
+    rememberStudioPlus({...result, productId:payload.productId, allowed:result.allowed===true, verified:result.verified===true});
     const finishToken=platform==='android'?tx?.purchaseToken:tx?.transactionId;
     if(finishToken){
       try{await NativePurchases.acknowledgePurchase({purchaseToken:String(finishToken)});}catch{}

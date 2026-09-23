@@ -23,7 +23,7 @@ import { estimateKey, sliceChannel } from './lib/keyEstimate'
 import { loadHostSession, type HostModule, type HostUser } from './hostSession'
 import {
   audioBufferToMp3,
-  audioBufferToWav,
+  exportMasterWav,
   blobToAudioBuffer,
   micMasterMix,
   smartMixMaster,
@@ -33,10 +33,11 @@ import {
 import { deliverBlob } from './lib/deliver'
 import { clampPocketSec, POCKET_LIMIT_SEC } from './lib/pocket'
 import { loopRangeFromBars, secToBar } from './lib/transport'
+import { sessionCan, sessionTier } from './lib/plan'
 import { QRCodeSVG } from 'qrcode.react'
 import { shiftAudioBuffer } from './lib/audioShift'
 import { STUDIO_VERSION } from './version'
-import { REDX_INSTALL_COMMAND, VOCAL_LAB_V040 } from './releases'
+import { VOCAL_LAB_V040 } from './releases'
 import './index.css'
 
 type Tab =
@@ -156,7 +157,9 @@ export default function App() {
       await seedFactoryPresets()
       setPresets(await listPresets())
       const proj = await getProject()
-      setSettings(proj.settings)
+      const loaded = proj.settings.grimOn && !sessionCan('grim') ? { ...proj.settings, grimOn: false } : proj.settings
+      setSettings(loaded)
+      if (location.hash === '#lab') setTab('lab')
       setBpm(proj.bpm)
       setLoopStart(proj.loopStartSec)
       setLoopEnd(proj.loopEndSec)
@@ -388,6 +391,10 @@ export default function App() {
   }
 
   const loadPreset = (p: Preset) => {
+    if (p.settings.grimOn && !sessionCan('grim')) {
+      setStatus('GRIM is on the $20 Basic plan.')
+      return
+    }
     setActivePresetId(p.id)
     setSettings(p.settings)
     engineRef.current?.applySettings(p.settings)
@@ -415,8 +422,8 @@ export default function App() {
     const compensationSec = Math.max(-0.2, Math.min(0.2, compensationMs / 1000))
     if (compensationSec) buf = shiftAudioBuffer(buf, -compensationSec)
     if (opts.offsetSec) buf = shiftAudioBuffer(buf, opts.offsetSec)
-    const wav = await audioBufferToWav(buf)
-    return saveTake({ name: opts.name, blob: wav, kind: opts.kind, offsetSec: opts.offsetSec })
+    const rendered = await exportMasterWav(buf, sessionTier())
+    return saveTake({ name: opts.name, blob: rendered.blob, kind: opts.kind, offsetSec: opts.offsetSec })
   }
 
   const processOfflineFile = async (file: File) => {
@@ -427,7 +434,7 @@ export default function App() {
     const buf = await blobToAudioBuffer(file)
     vocalBufRef.current = buf
     const processed = await engineRef.current.processOfflineBuffer(buf)
-    const wav = await audioBufferToWav(processed)
+    const wav = (await exportMasterWav(processed, sessionTier())).blob
     await saveTake({ name: `Offline ${file.name}`, blob: wav, kind: 'infected' })
     setTakes(await listTakes())
     setStatus(`Processed offline: ${file.name}`)
@@ -439,7 +446,7 @@ export default function App() {
     const buf = await blobToAudioBuffer(take.blob)
     const offset = pocketAssistOffsetSec(buf.getChannelData(0), buf.sampleRate, bpm)
     const shifted = shiftAudioBuffer(buf, offset)
-    const wav = await audioBufferToWav(shifted)
+    const wav = (await exportMasterWav(shifted, sessionTier())).blob
     await saveTake({
       name: `${take.name} (pocket ${(offset * 1000).toFixed(0)}ms)`,
       blob: wav,
@@ -456,7 +463,7 @@ export default function App() {
     const offset = clampPocketSec(pocketMs / 1000)
     const buf = await blobToAudioBuffer(take.blob)
     const shifted = shiftAudioBuffer(buf, offset)
-    const wav = await audioBufferToWav(shifted)
+    const wav = (await exportMasterWav(shifted, sessionTier())).blob
     await saveTake({
       name: `${take.name} (nudge ${(offset * 1000).toFixed(0)}ms)`,
       blob: wav,
@@ -468,6 +475,10 @@ export default function App() {
   }
 
   const runSmartMix = async () => {
+    if (!sessionCan('smart-mix')) {
+      setStatus('Smart Mix + Master is on the $20 Basic plan.')
+      return
+    }
     if (!beatBuf) {
       setStatus('Import a beat first')
       return
@@ -481,8 +492,8 @@ export default function App() {
     let vocal = await blobToAudioBuffer(vocalTake.blob)
     if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
     const mastered = await smartMixMaster(vocal, beatBuf)
-    const wav = await audioBufferToWav(mastered)
-    await saveTake({ name: `SMART MIX+MASTER ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
+    const rendered = await exportMasterWav(mastered, sessionTier())
+    await saveTake({ name: `SMART MIX+MASTER ${new Date().toLocaleTimeString()}`, blob: rendered.blob, kind: 'master' })
     setTakes(await listTakes())
     setStatus('SMART MIX+MASTER complete — vocal balanced, beat ducked, bus limited')
   }
@@ -501,7 +512,7 @@ export default function App() {
     let vocal = await blobToAudioBuffer(vocalTake.blob)
     if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
     const mastered = await micMasterMix(vocal, beatBuf)
-    const wav = await audioBufferToWav(mastered)
+    const wav = (await exportMasterWav(mastered, sessionTier())).blob
     await saveTake({ name: `Mic Master ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
     setTakes(await listTakes())
     setStatus('Mic Master complete — check Takes + Export')
@@ -521,7 +532,7 @@ export default function App() {
     let vocal = await blobToAudioBuffer(vocalTake.blob)
     if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
     const mastered = await ultimateMicMaster(vocal, beatBuf, master)
-    const wav = await audioBufferToWav(mastered)
+    const wav = (await exportMasterWav(mastered, sessionTier())).blob
     await saveTake({ name: `Ultimate Mic Master ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
     setTakes(await listTakes())
     setStatus('Ultimate Mic Master rendered with the current loudness, ducking, width and tone')
@@ -568,9 +579,10 @@ export default function App() {
     let buf = await blobToAudioBuffer(take.blob)
     if (take.offsetSec) buf = shiftAudioBuffer(buf, take.offsetSec)
     if (format === 'wav') {
-      const wav = await audioBufferToWav(buf)
-      const how = await deliverBlob(wav, `${take.name}.wav`)
-      setStatus(how === 'shared' ? `Shared ${take.name}.wav` : `Downloaded ${take.name}.wav`)
+      const rendered = await exportMasterWav(buf, sessionTier())
+      const how = await deliverBlob(rendered.blob, `${take.name}.wav`)
+      const verb = how === 'shared' ? 'Shared' : 'Downloaded'
+      setStatus(`${verb} ${take.name}.wav · ${rendered.label}`)
       return
     }
     const mp3 = await audioBufferToMp3(buf)
@@ -594,7 +606,7 @@ export default function App() {
     const speed = rapOnBeatRate(buf.duration, target)
     setRapRate(speed)
     const stretched = await engineRef.current.stretchBufferToDuration(buf, target)
-    const wav = await audioBufferToWav(stretched)
+    const wav = (await exportMasterWav(stretched, sessionTier())).blob
     await saveTake({
       name: `${pass.name} (on-beat ${target.toFixed(2)}s)`,
       blob: wav,
@@ -619,7 +631,7 @@ export default function App() {
         <p className="eyebrow">Vocal Lab channel v0.4.1 · Studio {STUDIO_VERSION}</p>
         <h1>Sign in to open Studio.</h1>
         <p>
-          The recording workspace stays behind the existing account sign-in. Studio stays locked until that account has a subscription or lifetime code. The published {VOCAL_LAB_V040.name} download is the public source zipball on GitHub.
+          The recording workspace stays behind the existing account sign-in. A signed-in account is Free until Basic, Pro, or a 7-day trial. The GitHub source zipball is not the Windows installer.
         </p>
         {hostError && <p className="error">{hostError}</p>}
         <div className="cta-row">
@@ -909,7 +921,13 @@ export default function App() {
             <div className="row" style={{ marginBottom: 12 }}>
               <button
                 className={settings.grimOn ? 'primary' : ''}
-                onClick={() => patchSettings({ grimOn: !settings.grimOn })}
+                onClick={() => {
+                  if (!settings.grimOn && !sessionCan('grim')) {
+                    setStatus('GRIM is on the $20 Basic plan.')
+                    return
+                  }
+                  patchSettings({ grimOn: !settings.grimOn })
+                }}
               >
                 GRIM {settings.grimOn ? 'ON' : 'OFF'}
               </button>
@@ -1071,7 +1089,13 @@ export default function App() {
           </section>
         )}
 
-        {tab === 'lab' && (
+        {tab === 'lab' && !sessionCan('project-lab') && (
+          <section className="panel">
+            <h2>Project Lab</h2>
+            <p className="panel-lead">Project Lab is on the $20 Basic plan. Free export is 16-bit WAV. Basic and Pro export 48 kHz / 24-bit WAV.</p>
+          </section>
+        )}
+        {tab === 'lab' && sessionCan('project-lab') && (
           <section className="panel">
             <h2>Project Lab</h2>
             <p className="panel-lead">
@@ -1304,18 +1328,14 @@ export default function App() {
           <section className="panel">
             <h2>Windows channel</h2>
             <p className="panel-lead">
-              GitHub release {VOCAL_LAB_V040.name} uses tag {VOCAL_LAB_V040.tag} and branch {VOCAL_LAB_V040.branch}. The download is that branch’s source zipball. Vocal Lab v0.4.1 is the channel in this Studio {STUDIO_VERSION} host. GitHub has no v0.4.1 release.
+              Phone and tablet builds install from the App Store or Google Play. This page does not host an ipa or aab. Windows is a signed build with its SHA-256 published beside the installer. The {VOCAL_LAB_V040.name} GitHub zipball is source, not the Windows app. There is no Mac .app.
             </p>
             <div className="take">
               <div>
-                <strong>{VOCAL_LAB_V040.name} · source release</strong>
-                <div className="muted">
-                  Tag {VOCAL_LAB_V040.tag} · branch {VOCAL_LAB_V040.branch}. Source zipball. The release page lists no uploaded installer assets.
-                </div>
+                <strong>Get the app</strong>
+                <div className="muted">/get and /download are the same page. Open web goes to /voices.</div>
               </div>
-              <a className="pill on" href={VOCAL_LAB_V040.zipball}>
-                Source zipball
-              </a>
+              <a className="pill on" href="/download">Download</a>
             </div>
             <div className="take">
               <div>
@@ -1327,20 +1347,13 @@ export default function App() {
               <span className="pill">In this host</span>
             </div>
             <ol className="notes">
-              <li>
-                Download the {VOCAL_LAB_V040.name} source zipball, or open the{' '}
-                <a href={VOCAL_LAB_V040.page}>release page</a>.
-              </li>
-              <li>
-                Install with <code>{REDX_INSTALL_COMMAND}</code>, then run <code>npm run build:browser</code>. esbuild is a devDependency, so the install must include dev packages.
-              </li>
-              <li>
-                <code>npm run package:windows</code> stages a local Electron shell from <code>browser-dist/</code>. It does not sign the app.
-              </li>
-              <li>Phone and tablet builds still ship through the App Store and Google Play.</li>
+              <li>iPhone and iPad install from the App Store. Android installs from Google Play. This page does not host an ipa or an aab.</li>
+              <li><a href="/voices">Open web</a> serves the studio at /voices.</li>
+              <li>Windows is a signed installer. Its SHA-256 is published with that file. An unsigned local package is not the download.</li>
+              <li>No Mac .app is published. Tag {VOCAL_LAB_V040.tag} on GitHub is source only.</li>
             </ol>
             <p className="muted">
-              A signing key for private desktop updates stays outside this repository. The source zipball is the published v0.4.0 artifact.
+              A signing key stays outside this repository. Do not treat the source archive as the Windows app.
             </p>
           </section>
         )}

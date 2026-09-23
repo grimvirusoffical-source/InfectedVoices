@@ -1,3 +1,5 @@
+import {canUse, clientSignal, featureById, lockBody} from './entitlements.js';
+
 export async function mountMobileChrome(){
  const shell=window.ivShell,config=await shell.config();
  const top=document.querySelector('.account-actions')||document.body;
@@ -131,13 +133,20 @@ export async function mountMobileChrome(){
   const search=E('input');search.type='search';search.placeholder='Search features';search.setAttribute('aria-label','Search features');search.enterKeyHint='search';
   const list=E('div');list.className='iv-more-list';
   const go=fn=>()=>{const run=()=>fn();if(modal.open){modal.addEventListener('close',run,{once:true});modal.close();}else run();};
+  const gate=(featureId,fn)=>go(()=>{
+    if(canUse(featureId, clientSignal())){fn();return;}
+    const feature=featureById(featureId);
+    if(typeof window.ivOpenLock==='function'){window.ivOpenLock(featureId);return;}
+    alert(lockBody(feature?.name||'This feature', featureId));
+  });
   const items=arrangement?[
    ['Record',go(()=>document.getElementById('record')?.click())],
-   ['Producer',go(()=>document.getElementById('core5Producer')?.click())],
-   ['GRIM rack',go(()=>document.getElementById('core5Producer')?.click())],
-   ['Automation',go(()=>document.getElementById('core5Producer')?.click())],
-   ['Sidechain',go(()=>document.getElementById('core5Producer')?.click())],
-   ['Precision Tune',go(()=>clickStage(4))],
+   ['Producer',gate('core5',()=>document.getElementById('core5Producer')?.click())],
+   ['GRIM rack',gate('grim',()=>document.getElementById('core5Producer')?.click())],
+   ['Automation',gate('core5',()=>document.getElementById('core5Producer')?.click())],
+   ['Sidechain',gate('core5',()=>document.getElementById('core5Producer')?.click())],
+   ['Precision Tune',gate('precision',()=>clickStage(4))],
+   ['Project Lab',gate('project-lab',()=>{location.href='index.html#lab';})],
    ['Pocket',go(()=>clickStage(3))],
    ['Mastering',go(()=>clickStage(6))],
    ['Export',go(()=>clickStage(7))],

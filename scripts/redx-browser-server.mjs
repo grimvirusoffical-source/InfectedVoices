@@ -213,6 +213,10 @@ const server=Bun.serve({
   hostname:HOST,port:PORT,
   async fetch(req){
     const url=new URL(req.url);
+    if(url.pathname==="/get"||url.pathname==="/get/"||url.pathname==="/download"||url.pathname==="/download/"){
+      const page=Bun.file(resolve(fileURLToPath(new URL("../download/index.html",import.meta.url))));
+      return new Response(page,{headers:{"content-type":"text/html; charset=utf-8","x-content-type-options":"nosniff"}});
+    }
     if(url.pathname.startsWith("/api/"))return api(req,url);
     let target=staticPath(url.pathname);
     if(!target)return new Response("Not found.",{status:404});

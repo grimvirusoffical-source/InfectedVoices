@@ -1,10 +1,14 @@
-import {PRO_FEATURES, canUse, featureById, lockBody, resolveTier} from './entitlements.js';
+import {PRO_FEATURES, BASIC_FEATURES, canUse, claimTrial, featureById, lockBody, readStudioPlus, resolveTier, trialUsed} from './entitlements.js';
 
 const COACH = [
-  {id:'record', title:'Record', body:'Hit REC and spit a take. Headphones help.', cta:'Record a take'},
-  {id:'tune', title:'Tune', body:'Snap pitch to the key. Start with Auto-Tune — go deeper anytime.', cta:'Auto-tune take'},
-  {id:'mix', title:'Mix', body:'One tap balances levels and loudness. Open Mixer to tweak.', cta:'One-click mix'},
-  {id:'export', title:'Export', body:'Bounce WAV or MP3. Stems need Pro.', cta:'Export WAV'}
+  {id:'record', view:'record', title:'Record', body:'Hit REC and spit a take. Headphones help.', cta:'Record a take', run:'recordTake'},
+  {id:'loop', view:'record', title:'Loop', body:'Loop a bar range, then record. Loop+Rec stays on while both are running.', cta:'Arm the loop', run:'armLoop'},
+  {id:'tune', view:'tune', title:'Tune', body:'Snap pitch to the key. Start with Auto-Tune — go deeper anytime.', cta:'Auto-tune take', run:'autoTune'},
+  {id:'pocket', view:'tune', title:'Pocket', body:'Assist stays inside ±80 ms. Precision Pocket is on Basic.', cta:'Open Pocket', feature:'precision'},
+  {id:'mix', view:'mix', title:'Mix', body:'One tap balances levels and loudness. Open Mixer to tweak.', cta:'One-click mix', run:'smartMix'},
+  {id:'lab', view:'mix', title:'Project Lab', body:'Stem gain, offset, and the take vault are on Basic.', cta:'Open Project Lab', feature:'project-lab'},
+  {id:'producer', view:'mix', title:'Producer', body:'GRIM, Precision, and Core 5 Producer are on Basic.', cta:'Open Producer', feature:'core5'},
+  {id:'export', view:'export', title:'Export', body:'Bounce WAV or MP3. Free export is 16-bit. Stems need Pro.', cta:'Export WAV', run:'exportWav'}
 ];
 const CHECKS = [
   {id:'record', label:'Record'},
@@ -24,6 +28,8 @@ const PRO_ACTIONS = [
 const GUARDS = {
   'Export aligned processed stems':'stems',
   'Export aligned dry stems':'stems',
+  'Export master · 24-bit WAV':'24-bit',
+  'Export unmastered · 24-bit WAV':'24-bit',
   'Open stem separation':'isolate',
   'Open parameter assistant':'ai-mix'
 };
@@ -113,23 +119,35 @@ export async function mountCreate({shell, config}) {
     try { return JSON.parse(localStorage.getItem(storageKey(name))) ?? fallback; }
     catch { return fallback; }
   }
+  function trials() { return readJSON('trials', {}); }
   function signal() {
     const user = window.ivStudioBridge?.currentUser?.() || {};
-    const badge = document.getElementById('accessBadge')?.textContent?.trim() || '';
+    const stored = trials();
+    const plus = readStudioPlus();
     return {
-      plan: user.plan || user.tier,
-      kind: user.kind || badge,
-      badge,
-      allowed: !!(user.userId || user.id || user.email || badge),
-      pro: user.pro === true,
-      capabilities: user.capabilities
+      plan: user.plan || plus?.plan,
+      kind: user.kind,
+      basic: user.basic === true || user.plan === 'basic' || user.tier === 'basic',
+      pro: user.pro === true || plus?.plan === 'pro',
+      verified: plus?.verified === true,
+      productId: plus?.productId || user.productId,
+      capabilities: user.capabilities,
+      basicTrialUsedAt: stored.basicTrialUsedAt || user.basicTrialUsedAt,
+      proTrialUsedAt: stored.proTrialUsedAt || user.proTrialUsedAt
     };
   }
   function tier() { return resolveTier(signal()); }
+  function startTrial(kind) {
+    const result = claimTrial(kind, trials());
+    if (!result.ok) return;
+    localStorage.setItem(storageKey('trials'), JSON.stringify(result.record));
+    render();
+  }
   function allowed(featureId) { return canUse(featureId, {...signal(), tier: tier()}); }
   function loadAccount() {
     const user = window.ivStudioBridge?.currentUser?.() || {};
     accountKey = String(user.userId || user.id || user.email || 'device');
+    localStorage.setItem('iv-active-account', accountKey);
     mode = localStorage.getItem(storageKey('mode')) || 'create';
     if (mode !== 'studio') mode = 'create';
     checks = {record:false, tune:false, mix:false, export:false, ...readJSON('checks', {})};
@@ -261,7 +279,14 @@ export async function mountCreate({shell, config}) {
     }
     toastMessage('Lock to Beat preview is ready.', () => openAdvanced('beat'));
   }
+  function armLoop() {
+    const input = document.getElementById('loop');
+    if (!input) return;
+    input.checked = true;
+    input.dispatchEvent(new Event('change'));
+  }
   async function smartMix() {
+    if (!allowed('smart-mix')) return openLock('smart-mix');
     if (arrangement()) {
       await setEngine('masterEngine', 'infected');
       clickStage(5);
@@ -285,15 +310,17 @@ export async function mountCreate({shell, config}) {
     render();
   }
   async function exportWav() {
+    const bits = allowed('24-bit') ? 24 : 16;
     if (arrangement()) {
       clickStage(7);
       await sleep(30);
-      if (!clickNamed('Export master · 24-bit WAV')) throw Error('Export WAV is not available yet.');
+      const label = bits === 24 ? 'Export master · 24-bit WAV' : 'Export master · 16-bit WAV';
+      if (!clickNamed(label)) throw Error(bits + '-bit WAV export is not available yet.');
       await waitIdle();
       assertStatus();
     } else {
       const format = document.getElementById('format');
-      if (format) { format.value = 'wav24'; format.dispatchEvent(new Event('change')); }
+      if (format) { format.value = bits === 24 ? 'wav24' : 'wav16'; format.dispatchEvent(new Event('change')); }
       document.getElementById('export')?.click();
       await waitIdle();
     }
@@ -354,7 +381,7 @@ export async function mountCreate({shell, config}) {
     if (!rec) throw Error('Record is not available on this screen.');
     rec.click();
   }
-  const runners = {autoTune, lockBeat, smartMix, exportWav, exportStems, recordTake};
+  const runners = {autoTune, lockBeat, smartMix, exportWav, exportStems, recordTake, armLoop};
 
   function toastMessage(text, advanced) {
     toast.hidden = false;
@@ -380,9 +407,10 @@ export async function mountCreate({shell, config}) {
     head.className = 'dialog-top iv-sheet-top';
     const titles = E('div');
     titles.className = 'iv-sheet-titles';
-    const kicker = E('p', 'Pro');
+    const basicGate = BASIC_FEATURES.some(feature => feature.id === featureId);
+    const kicker = E('p', basicGate ? 'Basic' : 'Pro');
     kicker.className = 'iv-kicker';
-    titles.append(kicker, E('h2', 'Unlock with Pro'));
+    titles.append(kicker, E('h2', basicGate ? 'Unlock with Basic' : 'Unlock with Pro'));
     const close = E('button', 'Close');
     close.type = 'button';
     close.className = 'iv-sheet-close';
@@ -391,22 +419,30 @@ export async function mountCreate({shell, config}) {
     head.append(titles, close);
     const body = E('div');
     body.className = 'mobile-native-body';
-    body.append(E('p', lockBody(feature?.name || 'This feature')));
+    body.append(E('p', lockBody(feature?.name || 'This feature', featureId)));
     const list = E('ul');
     list.className = 'iv-perks';
-    for (const item of PRO_FEATURES) list.append(E('li', item.name));
+    for (const item of (basicGate ? BASIC_FEATURES : PRO_FEATURES)) list.append(E('li', item.name));
     body.append(list);
     const actions = E('div');
     actions.className = 'iv-sheet-actions';
-    const buy = E('button', 'Get Pro — $40');
+    const buy = E('button', basicGate ? 'Get Basic — $20' : 'Get Pro — $40');
     buy.type = 'button';
     buy.className = 'primary';
     buy.onclick = () => {
       lock.close();
-      if (showStripe) { showView('subscribe'); setMode('create'); }
-      else openStore();
+      if (!basicGate && !showStripe) openStore();
+      else { showView('subscribe'); setMode('create'); }
     };
     actions.append(buy);
+    const trialKind = basicGate ? 'basic' : 'pro';
+    const trialKey = trialKind === 'pro' ? 'proTrialUsedAt' : 'basicTrialUsedAt';
+    if (!trialUsed(signal()[trialKey]) && tier() === 'free') {
+      const trial = E('button', trialKind === 'pro' ? 'Start 7-day Pro trial' : 'Start 7-day Basic trial');
+      trial.type = 'button';
+      trial.onclick = () => { lock.close(); startTrial(trialKind); };
+      actions.append(trial);
+    }
     const later = E('button', 'Maybe later');
     later.type = 'button';
     later.className = 'ghost';
@@ -424,19 +460,29 @@ export async function mountCreate({shell, config}) {
     if (typeof window.ivOpenNativeStore === 'function') window.ivOpenNativeStore();
     else openWeb();
   }
+  function openProjectLab() {
+    if (!allowed('project-lab')) return openLock('project-lab');
+    location.href = (arrangement() ? 'index.html' : '../index.html') + '#lab';
+  }
   function openMore() {
+    const gate = (featureId, fn) => () => {
+      moreDialog.close();
+      if (!allowed(featureId)) { openLock(featureId); return; }
+      fn();
+    };
     const items = [
       ['Guided tour', () => { moreDialog.close(); coachSkipped = false; openCoach(0); }],
       ['Record', () => { moreDialog.close(); setMode('studio'); document.getElementById('record')?.click(); }],
-      ['Producer', () => { moreDialog.close(); openAdvanced('producer'); }],
-      ['GRIM rack', () => { moreDialog.close(); openAdvanced('producer'); }],
-      ['Precision Tune', () => { moreDialog.close(); openAdvanced('tune'); }],
+      ['Producer', gate('core5', () => openAdvanced('producer'))],
+      ['GRIM rack', gate('grim', () => openAdvanced('producer'))],
+      ['Precision Tune', gate('precision', () => openAdvanced('tune'))],
+      ['Project Lab', gate('project-lab', () => { location.href = (arrangement() ? 'index.html' : '../index.html') + '#lab'; })],
       ['Pocket', () => { moreDialog.close(); openAdvanced('beat'); }],
       ['Plugins', () => { moreDialog.close(); setMode('studio'); document.getElementById('pluginsTab')?.click(); }],
       ['Release & connect', () => { moreDialog.close(); setMode('studio'); document.getElementById('integrationsTab')?.click(); }],
       ['AI tools', () => { moreDialog.close(); setMode('studio'); document.getElementById('aiTab')?.click(); }],
       ['Mastering', () => { moreDialog.close(); openAdvanced('master'); }],
-      ['Export', () => { moreDialog.close(); openAdvanced('export'); }],
+      ['Export', () => { moreDialog.close(); showView('export'); setMode('create'); }],
       ['Tutorial', () => { moreDialog.close(); setMode('studio'); document.getElementById('tutorial')?.click(); }],
       ['Saved projects', () => { moreDialog.close(); setMode('studio'); document.getElementById('openSaved')?.click(); }],
       [arrangement() ? 'Classic Studio' : 'Arrangement Studio', () => { location.href = arrangement() ? 'lab/index.html' : '../studio.html'; }],
@@ -615,7 +661,8 @@ export async function mountCreate({shell, config}) {
     const screen = E('div');
     screen.className = 'iv-screen';
     screen.append(E('h2', 'Export'));
-    const wav = E('button', 'Export WAV');
+    const bits = allowed('24-bit') ? '24-bit' : '16-bit';
+    const wav = E('button', 'Export ' + bits + ' WAV');
     wav.type = 'button';
     wav.id = 'ivExportWav';
     wav.className = 'primary iv-wide';
@@ -632,10 +679,11 @@ export async function mountCreate({shell, config}) {
     screen.className = 'iv-screen';
     const kicker = E('p', 'Plans');
     kicker.className = 'iv-kicker';
-    screen.append(kicker, E('h2', 'Basic and Pro'));
+    screen.append(kicker, E('h2', 'Free, Basic, and Pro'));
     const plans = E('div');
     plans.className = 'iv-plans';
-    plans.append(planCard('basic', 'Basic', '$20', ['Core studio — record, arrange, classic FX', 'Auto-Tune, Lock to Beat, Smart Mix', 'Export master WAV / MP3']));
+    plans.append(planCard('free', 'Free', '$0', ['Record and arrange', 'Export master 16-bit WAV', 'Classic MP3']));
+    plans.append(planCard('basic', 'Basic', '$20', ['GRIM, Precision Tune, Core 5 Producer', 'Smart Mix + Master and Project Lab', '48 kHz / 24-bit WAV']));
     plans.append(planCard('pro', 'Pro', '$40', PRO_FEATURES.map(feature => feature.name)));
     screen.append(plans);
     if (!showStripe) {
@@ -651,14 +699,14 @@ export async function mountCreate({shell, config}) {
     return screen;
   }
   function planCard(id, title, price, lines) {
-    const current = tier() === id || (id === 'basic' && tier() === 'basic');
+    const current = tier() === id;
     const article = E('article');
     article.className = 'iv-plan' + (id === 'basic' ? ' is-raised' : '') + (id === 'pro' && tier() !== 'pro' ? ' is-featured' : '');
     article.append(E('h3', title), E('p', price));
     const list = E('ul');
     for (const line of lines) list.append(E('li', line));
     article.append(list);
-    if (current && tier() !== 'none') {
+    if (current) {
       const button = E('button', 'Current plan');
       button.type = 'button';
       button.disabled = true;
@@ -669,20 +717,31 @@ export async function mountCreate({shell, config}) {
       button.className = 'primary';
       button.onclick = () => showStripe ? openWeb() : openStore();
       article.append(button);
+      article.append(trialButton('pro'));
     } else if (id === 'basic') {
       const button = E('button', showStripe ? 'Get Basic — $20' : 'On web/desktop');
       button.type = 'button';
       button.onclick = () => openWeb();
       article.append(button);
+      article.append(trialButton('basic'));
     }
     return article;
+  }
+  function trialButton(kind) {
+    const key = kind === 'pro' ? 'proTrialUsedAt' : 'basicTrialUsedAt';
+    const button = E('button', trialUsed(signal()[key]) ? 'Trial already used' : (kind === 'pro' ? 'Start 7-day Pro trial' : 'Start 7-day Basic trial'));
+    button.type = 'button';
+    button.className = 'ghost iv-wide';
+    button.disabled = trialUsed(signal()[key]) || (kind === 'basic' ? tier() !== 'free' : tier() === 'pro');
+    button.onclick = () => startTrial(kind);
+    return button;
   }
 
   function openCoach(step) {
     if (!surfaceReady()) { mode = 'create'; saveMode(); }
     coachStep = Math.max(0, Math.min(COACH.length - 1, step));
     coachOpen = true;
-    view = COACH[coachStep].id;
+    view = COACH[coachStep].view || COACH[coachStep].id;
     mode = 'create';
     saveMode();
     dontAgain = false;
@@ -722,10 +781,14 @@ export async function mountCreate({shell, config}) {
     go.type = 'button';
     go.className = 'primary iv-wide';
     go.onclick = () => {
-      if (step.id === 'record') runAction('recordTake');
-      else if (step.id === 'tune') runAction('autoTune');
-      else if (step.id === 'mix') runAction('smartMix');
-      else runAction('exportWav');
+      if (step.feature) {
+        if (!allowed(step.feature)) { openLock(step.feature); return; }
+        if (step.feature === 'project-lab') { openProjectLab(); return; }
+        if (step.feature === 'core5') { openAdvanced('producer'); return; }
+        openAdvanced(step.feature === 'precision' ? 'tune' : 'beat');
+        return;
+      }
+      if (step.run) runAction(step.run);
     };
     const navRow = E('div');
     navRow.className = 'iv-coach-nav';
@@ -792,7 +855,11 @@ export async function mountCreate({shell, config}) {
   }
   function guardedFeature(button) {
     if (!button || button.closest('#ivCreate, #ivCoach, #ivLockSheet, #ivMoreSheet, #ivToast, .iv-rail, #ivCreateNav')) return '';
-    return button.id === 'exportStem' ? 'stems' : (GUARDS[button.textContent.trim()] || '');
+    if (button.id === 'core5Producer') return 'core5';
+    if (button.id === 'exportStem') return 'stems';
+    const text = button.textContent.trim();
+    if (text === 'GRIM rack' || text.startsWith('GRIM')) return 'grim';
+    return GUARDS[text] || '';
   }
   document.addEventListener('click', event => {
     const button = event.target.closest?.('button');
@@ -851,5 +918,6 @@ export async function mountCreate({shell, config}) {
   loadAccount();
   render();
   maybeCoach();
+  window.ivOpenLock = openLock;
   return {setMode, openCoach, openLock, tier, allowed};
 }

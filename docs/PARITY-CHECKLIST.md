@@ -4,16 +4,28 @@ Source of truth for this expansion: `docs/STUDY-infectedvoices-merge-gaps.md`. U
 
 Cap `webDir` is `dist/` from `npm run build:web`. The pinned vendor payload is **0.6.6-core6.1** (`dist/releases/studio.json`, SHA-256 `e6288c29a180d8d6048fcc9117a6f6a50e7d3225920aadeb2fe48288adaf8967`). The store build rebrands `0.6 COLLAB PILOT` to `CORE 5 MOBILE` and does not bootstrap collaboration. Package version stays 0.7.0. The native shell line is `0.6.6-mobile.2`.
 
+## Plans
+
+A signed-in account is **Free**. `allowed`, lifetime, member, studio, or a badge is not Basic.
+
+| Tier | What it unlocks |
+|---|---|
+| Free | Record, arrange, classic MP3, and a master export labeled **16-bit WAV**. Free does not unlock GRIM, Precision Tune, Core 5 Producer, 24-bit export, Smart Mix + Master, or Project Lab |
+| Basic ($20) | Those six tools. Default export is **48 kHz / 24-bit**. One 7-day trial per account (`basicTrialUsedAt`) |
+| Pro ($40) | Everything in Basic, plus stems, AI mix/master, AI auto-tune, AI beat-lock, and vocal isolation. One 7-day trial (`proTrialUsedAt`). A verified Studio Plus receipt (`infectedvoices.studio.monthly`) maps to **Pro** |
+
+Cloud AI stays a real `503` with `provider_not_configured`. The app does not invent a bounce. `/get` and `/download` are the same page: App Store and Google Play only (no ipa, no aab), Windows signed with SHA-256 beside the installer, open web goes to `/voices`, and there is no Mac `.app`. The GitHub zipball is source, not the Windows installer.
+
 ## Already in the Capacitor app
 
 | Function | Where |
 |---|---|
-| Core 1–5 arrangement | `studio.html` — multitrack, import, practice session, journal/recovery, comp/punch, Precision Tune, Precision Pocket, Core 3 mixer, Core 5 automation/sidechain/GRIM, LUFS mastering, WAV 16/24, stems ZIP, `.ivproject` |
-| Classic Studio + MP3 | `lab/index.html` — pocket, master profiles, `lamejs`, vocal stem export |
-| Vocal Lab 0.7.0 home | `dist/index.html` — Project Lab tab, bar/beat loop, Pocket Assist ±80 ms, SMART MIX+MASTER button, Ultimate Mic Master, Grim Beats, local RoEx key field, WAV/MP3 |
+| Core 1–5 arrangement | `studio.html` — multitrack, import, practice session, journal/recovery, comp/punch, Core 3 mixer, LUFS stage, `.ivproject`. GRIM, Precision Tune, Core 5 Producer, and 24-bit export are **Basic+**. Stems ZIP is **Pro** |
+| Classic Studio + MP3 | `lab/index.html` — pocket and master profiles, `lamejs`. Classic MP3 is Free. Vocal stem export is **Pro** |
+| Vocal Lab 0.7.0 home | `dist/index.html` — bar/beat loop, Pocket Assist ±80 ms, Ultimate Mic Master, Grim Beats, local RoEx key field. Project Lab and SMART MIX+MASTER are **Basic+**. Free WAV is 16-bit; Basic and Pro default to 48 kHz / 24-bit |
 | Native share + 256 MB cap | `vocal-bridge.js` → `ivShell.saveFile` |
-| Create \| Studio, coach, Basic one-clicks | Arrangement and Classic chrome. Arrangement Smart Mix is balance + the Rap master preset |
-| Pro gates | Stems, AI mix/master, AI tune, AI beat-lock, vocal isolation. Menus stay |
+| Create \| Studio | 8-step coach. Free, Basic, and Pro cards with once-each 7-day trial buttons. Smart Mix, More → GRIM / Precision / Producer / Project Lab, and 24-bit export follow the plan |
+| Pro gates | Stems, AI mix/master, AI tune, AI beat-lock, vocal isolation. Menus stay. Lock copy stays “$40 Pro plan” |
 | House zinc/indigo, 44px targets | `mobile.css` and Vocal Lab controls |
 | HTTPS host switch, store updates | Settings and Updates. Health check is `/api/health` with `service === InfectedVoices` |
 | InfectedNation handoff | `https://nation.infectedvoices.space`. Apple, Google, Android/passkey, and email |
@@ -53,7 +65,7 @@ DLL, CLAP, and the signed updater stay on Windows. These three UX items are the 
 
 | Source function | Cap |
 |---|---|
-| Core 5 arrangement, mixer, GRIM, precision, classic lab | Same pinned vendor payload in `dist/` |
+| Core 5 arrangement, mixer, GRIM, precision, classic lab | Same pinned vendor payload in `dist/`. Free does not unlock GRIM, Precision, Core 5, or 24-bit |
 | Vocal Lab 0.7.0 | Cap home. 0.3.0 stem board and loop-while-record are still open |
 | InfectedNation connect | Cap `signIn({flow, method})`. Browser auth grid uses `iv-auth-request` |
 | RedXAIHost Studio Bearer API | `ivShell.request`. `desktop-session.js` wraps the JSON as `{data}` |
