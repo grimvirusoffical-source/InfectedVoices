@@ -1,0 +1,24 @@
+{
+  "name": "InfectedVoices",
+  "url": "https://github.com/grimvirusoffical-source/InfectedVoices",
+  "branch": "main",
+  "commit": "2fb04c2ce1ac4e49ea9105207f436b8b6cf1d80d",
+  "subject": "Merge Cap PR #3: Core mobile clear bar (Stress PASS)",
+  "stress": "CLEAR BAR PASS",
+  "packageVersion": "0.7.0",
+  "nativeShell": "0.6.6-mobile.2",
+  "vendorPayload": "0.6.6-core6.1",
+  "vendorSha256": "e6288c29a180d8d6048fcc9117a6f6a50e7d3225920aadeb2fe48288adaf8967",
+  "appId": "space.infectedvoices.studio",
+  "webBuild": "npm run build:web",
+  "browserBuild": "npm run build:browser",
+  "tiers": [
+    "Free",
+    "Basic",
+    "Pro"
+  ],
+  "trials": {
+    "basic": "basicTrialUsedAt",
+    "pro": "proTrialUsedAt"
+  }
+}

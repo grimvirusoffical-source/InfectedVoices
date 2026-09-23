@@ -1,0 +1,14 @@
+{
+  "status": "hook-only",
+  "selectedHost": "webview2",
+  "alternatesNotImplemented": [
+    "electron",
+    "tauri"
+  ],
+  "coreBuild": "npm run build:web",
+  "payloadDir": "payload/app",
+  "signing": "placeholder",
+  "sha256File": "release/SHA256SUMS.txt",
+  "cutsRelease": false,
+  "notes": "Do not invent an installer, a certificate, or a SHA-256. Publish the hash beside the signed file only after a real Release."
+}

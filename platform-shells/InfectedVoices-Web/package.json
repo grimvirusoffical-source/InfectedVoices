@@ -1,0 +1,16 @@
+{
+  "name": "infectedvoices-web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Thin static host for Infected Voices. The studio payload comes from Core.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test scripts/self-check.test.mjs scripts/serve.test.mjs",
+    "stage": "node scripts/stage-site.mjs --stage",
+    "start": "node scripts/serve.mjs",
+    "check": "node scripts/stage-site.mjs"
+  }
+}
