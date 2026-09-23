@@ -32,7 +32,7 @@ for(const marker of ['App Store','Google Play','SHA-256','/voices','No Mac .app'
 const windows=await fs.readFile(path.join(root,'download','windows.html'),'utf8');
 if(!windows.includes('Download .exe')||!windows.includes('{{WINDOWS_SHA256}}')||!windows.includes('44.1 kHz · 16-bit')||!windows.includes('48 kHz · 24-bit'))throw Error('Windows download page is missing the installer CTA or delivery labels.');
 const pages={};
-for(const file of ['index.html','windows.html','ios.html','android.html','web.html'])pages[file]=await fs.readFile(path.join(root,'download',file),'utf8');
+for(const file of ['index.html','windows.html','mac.html','ios.html','android.html','web.html'])pages[file]=await fs.readFile(path.join(root,'download',file),'utf8');
 const {safeUrl,renderDownload,assertDownloadPages}=await import('./download-pages.mjs');
 if(safeUrl('javascript:alert(1)','https://apps.apple.com/')!=='https://apps.apple.com/')throw Error('Download URLs must reject javascript:.');
 if(safeUrl('//evil.example','/voices/')!=='/voices/')throw Error('Download URLs must reject protocol-relative links.');
@@ -57,6 +57,13 @@ const mount=await fs.readFile(path.join(root,'browser-src','create-mount.js'),'u
 for(const marker of ['44.1 kHz · 16-bit','48 kHz · 24-bit','Auto-Tune','Lock to Beat','Smart Mix'])if(!createSrc.includes(marker))throw Error('Shared Create chrome is missing '+marker);
 if(!exportSrc.includes("label: '44.1 kHz · 16-bit WAV'")||!exportSrc.includes("label: '48 kHz · 24-bit WAV'"))throw Error('Vocal Lab export labels drifted from Free 16-bit and Basic+ 48 kHz / 24-bit.');
 if(!mount.includes("from './mobile-create.js'"))throw Error('Browser studio is not mounting the Cap Create chrome.');
+const browserBuild=await fs.readFile(path.join(root,'scripts','build-browser.mjs'),'utf8');
+const webBuild=await fs.readFile(path.join(root,'scripts','build-web.mjs'),'utf8');
+const capacitor=await fs.readFile(path.join(root,'capacitor.config.json'),'utf8');
+if(!browserBuild.includes('build-web.mjs')||!browserBuild.includes('mobile-create.js')||!webBuild.includes('mobile-create.js')||!capacitor.includes('"webDir": "dist"'))throw Error('Cap and browser are not sharing the Core 5 web payload.');
+const channels=await fs.readFile(path.join(root,'docs','RELEASE-CHANNELS.md'),'utf8');
+for(const marker of ['InfectedVoices-Windows','InfectedVoices-Android','InfectedVoices-iOS','No `InfectedVoices-Mac` repo','not finished'])if(!channels.includes(marker))throw Error('Release channels doc is missing '+marker);
+if(!pages['mac.html'].includes('No Mac .app')||!pages['mac.html'].includes('44.1 kHz · 16-bit')||!pages['mac.html'].includes('48 kHz · 24-bit'))throw Error('Mac page is missing Create delivery honesty.');
 const server=await fs.readFile(path.join(root,'scripts','redx-browser-server.mjs'),'utf8');
 if(!server.includes('pathname==="/get"')||!server.includes('pathname==="/download"'))throw Error('/get is not the same page as /download.');
 if(!server.includes('provider_not_configured')||!server.includes('503'))throw Error('Cloud AI routes must stay real 503s.');

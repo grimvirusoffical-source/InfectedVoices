@@ -7,7 +7,7 @@
   <title>Get Infected Voices</title>
   <link rel="stylesheet" href="/get/get.css">
 </head>
-<body data-windows="{{WINDOWS_URL}}" data-ios="{{APP_STORE_URL}}" data-android="{{PLAY_STORE_URL}}" data-web="{{WEB_URL}}">
+<body data-windows="{{WINDOWS_URL}}" data-mac="{{WEB_URL}}" data-ios="{{APP_STORE_URL}}" data-android="{{PLAY_STORE_URL}}" data-web="{{WEB_URL}}">
   <main class="wrap">
     <nav class="nav" aria-label="Site">
       <a href="/get" aria-current="page">Get</a>
@@ -28,6 +28,14 @@
         <a class="cta" href="{{WINDOWS_URL}}">Download for Windows</a>
         <p class="sha" id="windowsSha256">{{WINDOWS_SHA256}}</p>
         <a class="ghost" href="/get/windows">System requirements</a>
+      </article>
+      <article class="card" data-platform="mac">
+        <p class="badge">Recommended</p>
+        <p class="kicker">Desktop</p>
+        <h2>Mac</h2>
+        <p>No Mac .app is published. Mac uses the same Create | Studio session as the browser, with the same Free, Basic, and Pro gates.</p>
+        <a class="cta" href="{{WEB_URL}}">Launch studio</a>
+        <a class="ghost" href="/get/mac">Mac details</a>
       </article>
       <article class="card" data-platform="ios">
         <p class="badge">Recommended</p>

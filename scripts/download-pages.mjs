@@ -1,7 +1,7 @@
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
-const FILES = ['index.html', 'windows.html', 'ios.html', 'android.html', 'web.html', 'get.css', 'get.js'];
+const FILES = ['index.html', 'windows.html', 'mac.html', 'ios.html', 'android.html', 'web.html', 'get.css', 'get.js'];
 const WINDOWS_FALLBACK = 'https://github.com/grimvirusoffical-source/InfectedVoices/releases';
 const APP_FALLBACK = 'https://apps.apple.com/';
 const PLAY_FALLBACK = 'https://play.google.com/store';
@@ -129,6 +129,7 @@ export function assertDownloadPages(pages, env = {}) {
   const windows = rendered['windows.html'] || '';
   const ios = rendered['ios.html'] || '';
   const android = rendered['android.html'] || '';
+  const mac = rendered['mac.html'] || '';
   const web = rendered['web.html'] || '';
   const urls = downloadUrls(env);
   if (!isWindowsRelease(urls.WINDOWS_URL)) throw new Error('Windows CTA is not a GitHub Release or RedX static installer.');
@@ -145,6 +146,12 @@ export function assertDownloadPages(pages, env = {}) {
     if (chrome(href)) continue;
     if (!isPlayStore(href)) throw new Error('Android page has a non-Play download: ' + href);
   }
+  if (!mac.includes('No Mac .app') || !hub.includes('No Mac .app')) throw new Error('Mac must stay honest: no .app is published.');
+  for (const href of hrefs(mac)) {
+    if (chrome(href) || isAppleStore(href)) continue;
+    if (/\.(dmg|pkg|app)(?:$|[?#])/i.test(href)) throw new Error('Mac page hosts a desktop installer: ' + href);
+    throw new Error('Mac page has a download that is not Open web or the App Store: ' + href);
+  }
   if (!windows.includes('id="windowsSha256"') || !windows.includes('SHA-256') || !hub.includes('id="windowsSha256"') || !hub.includes('SHA-256')) {
     throw new Error('Windows SHA-256 is not shown on /get.');
   }
@@ -160,7 +167,7 @@ export function assertDownloadPages(pages, env = {}) {
     if (!body.includes('/voices') && name !== 'android.html' && name !== 'ios.html') throw new Error(name + ' does not send open web to /voices.');
     if (!body.includes('44.1 kHz · 16-bit') || !body.includes('48 kHz · 24-bit')) throw new Error(name + ' drops Free 16-bit or Basic+ 48 kHz / 24-bit.');
   }
-  for (const pair of [['/get', '/download'], ['/get/windows', '/download/windows'], ['/get/ios', '/download/ios'], ['/get/android', '/download/android'], ['/get/web', '/download/web']]) {
+  for (const pair of [['/get', '/download'], ['/get/windows', '/download/windows'], ['/get/mac', '/download/mac'], ['/get/ios', '/download/ios'], ['/get/android', '/download/android'], ['/get/web', '/download/web']]) {
     if (DOWNLOAD_ROUTES[pair[0]] !== DOWNLOAD_ROUTES[pair[1]]) throw new Error(pair.join(' is not the same page as '));
   }
   return rendered;
@@ -195,6 +202,10 @@ export const DOWNLOAD_ROUTES = {
   '/get/windows/': 'windows.html',
   '/download/windows': 'windows.html',
   '/download/windows/': 'windows.html',
+  '/get/mac': 'mac.html',
+  '/get/mac/': 'mac.html',
+  '/download/mac': 'mac.html',
+  '/download/mac/': 'mac.html',
   '/get/ios': 'ios.html',
   '/get/ios/': 'ios.html',
   '/download/ios': 'ios.html',
