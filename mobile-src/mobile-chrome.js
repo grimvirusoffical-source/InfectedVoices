@@ -42,6 +42,11 @@ export async function mountMobileChrome(){
   try{await shell.signIn({flow,method});location.reload();}
   finally{busy=false;}
  }
+ function keepHidden(target){
+  const hide=()=>{if(!target.hidden)target.hidden=true;};
+  hide();
+  new MutationObserver(hide).observe(target,{attributes:true,attributeFilter:['hidden']});
+ }
  function authChoices(target){
   if(!target||target.querySelector('.infected-auth-choices'))return;
   const box=E('section');box.className='infected-auth-choices';
@@ -55,9 +60,11 @@ export async function mountMobileChrome(){
   target.prepend(box);
  }
  const loginSection=document.querySelector('#loginWall section');
- if(loginSection){document.getElementById('signIn')?.setAttribute('hidden','');authChoices(loginSection);}
+ const signIn=document.getElementById('signIn');
+ if(loginSection){if(signIn)keepHidden(signIn);authChoices(loginSection);}
  const classicWall=document.getElementById('labLoginWall');
- if(classicWall){document.getElementById('labSignInHero')?.setAttribute('hidden','');authChoices(classicWall);}
+ const labHero=document.getElementById('labSignInHero');
+ if(classicWall){if(labHero)keepHidden(labHero);authChoices(classicWall);}
  const platformLabel=config.platform==='ios'?'iPhone / iPad':config.platform==='android'?'Android':'this device';
  const storeName=config.platform==='ios'?'Apple App Store':config.platform==='android'?'Google Play':'platform app store';
  async function showStore(){
