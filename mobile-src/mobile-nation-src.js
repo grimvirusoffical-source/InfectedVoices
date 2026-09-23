@@ -1,4 +1,4 @@
-const NATION_ORIGIN='https://infectednation-r4qd51.v2.appdeploy.ai';
+const NATION_ORIGIN='https://nation.infectedvoices.space';
 const APP_ID='infected-voices';
 
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -48,11 +48,13 @@ export function createNationClient({Browser,SecureStorage}){
     try{return (await nationRequest('/api/v1/session/me',{token})).account||null;}
     catch(e){if(e.status===401)await tokenSet('');throw e;}
   }
-  async function signIn(){
+  async function signIn(options={}){
+    const flow=options.flow==='signup'?'signup':'login';
+    const method=['apple','google','android','email'].includes(options.method)?options.method:'email';
     const secret=randomSecret();
     const request=await nationRequest('/api/v1/connect/start',{appId:APP_ID,secret});
     if(typeof request.id!=='string'||!Number.isFinite(request.expires))throw Error('InfectedNation returned an invalid connection request.');
-    const url=NATION_ORIGIN+'/?connect='+encodeURIComponent(request.id)+'&app='+encodeURIComponent(APP_ID);
+    const url=NATION_ORIGIN+'/?connect='+encodeURIComponent(request.id)+'&app='+encodeURIComponent(APP_ID)+'&flow='+encodeURIComponent(flow)+'&method='+encodeURIComponent(method);
     await Browser.open({url,presentationStyle:'popover'});
     while(Date.now()<request.expires){
       await pause(1800);
@@ -82,5 +84,6 @@ export function createNationClient({Browser,SecureStorage}){
     return nationRequest('/api/v1/security/history',{token});
   }
   async function currentToken(){return tokenGet();}
-  return Object.freeze({origin:NATION_ORIGIN,me,signIn,signOut,securityHistory,currentToken});
+  async function post(path,payload){return nationRequest(path,payload);}
+  return Object.freeze({origin:NATION_ORIGIN,me,signIn,signOut,securityHistory,currentToken,post});
 }

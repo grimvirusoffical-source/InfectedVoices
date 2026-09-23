@@ -5,3 +5,5 @@ app-source/
 *.xcuserdata
 DerivedData/
 .secrets/
+browser-dist/
+data/

@@ -18,6 +18,7 @@ await fs.cp(sourceWeb,out,{recursive:true});
 await fs.writeFile(path.join(out,'package.json'),JSON.stringify({type:'module'})+'\n');
 await fs.copyFile(path.join(source,'classic-runtime.js'),path.join(out,'lab','studio-runtime.js'));
 await fs.copyFile(redxApi,path.join(out,'api.js'));
+await fs.copyFile(path.join(root,'browser-src','auth-choices.js'),path.join(out,'auth-choices.js'));
 
 const accountPath=path.join(classic,'account.js');
 const browserPlugin={
@@ -47,6 +48,13 @@ await build({
   bundle:true,format:'esm',platform:'browser',outdir:out,target:['safari17','chrome120'],
   minify:false,legalComments:'eof',plugins:[browserPlugin],define:{'process.env.NODE_ENV':'"production"'}
 });
+const browserAccountPath=path.join(out,'lab','account-entry.js');
+let browserAccount=await fs.readFile(browserAccountPath,'utf8');
+browserAccount=browserAccount
+  .replace(/\$\("subscribe"\)\.onclick = \(\) => message\("Purchases are not offered inside the iOS build\."\);/g,'$("subscribe").onclick = () => task(() => navigateBilling("/api/billing/checkout"));')
+  .replace(/\$\("billing"\)\.onclick = \(\) => message\("Billing links are not offered inside the iOS build\."\);/g,'$("billing").onclick = () => task(() => navigateBilling("/api/billing/portal"));')
+  .replace(/iOS existing-account access/g,'RedXAIHost account');
+await fs.writeFile(browserAccountPath,browserAccount);
 
 let index=await fs.readFile(path.join(out,'index.html'),'utf8');
 index=`<!doctype html>
@@ -69,6 +77,7 @@ studio=studio
   .replace(/0\.6 COLLAB PILOT/g,'CORE 5 · REDXAIHOST')
   .replace(/Sign in with Google to view and use Infected Voices\.[^<]*/g,'Sign in or create your InfectedNation account to use Infected Voices. Apple, Google, passkey and email identities all map to the same account.')
   .replace(/Continue with Google/g,'Sign in / create account')
+  .replace('</head>',`<style>.infected-auth-choices{display:grid;gap:10px;margin:14px 0 18px}.infected-auth-choices h3{margin:8px 0 0;font-size:14px}.infected-auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.infected-auth-grid button{width:100%}.infected-auth-grid .apple-auth{background:#fff;color:#111;border-color:#fff}@media(max-width:620px){.infected-auth-grid{grid-template-columns:1fr}}</style><script src="./auth-choices.js" defer></script></head>`)
   .replace(/This release is a preview; retain project backups\./g,'Keep portable project backups before major edits or updates.');
 await fs.writeFile(path.join(out,'studio.html'),studio);
 
@@ -87,7 +96,13 @@ await fs.writeFile(workstationPath,workstation);
 
 const labPath=path.join(out,'lab','index.html');
 let lab=await fs.readFile(labPath,'utf8');
-lab=lab.replace(/<script>if\('serviceWorker'[\s\S]*?<\/script>/g,'');
+lab=lab
+  .replace(/<script>if\('serviceWorker'[\s\S]*?<\/script>/g,'')
+  .replace(/Sign in with Google to open Studio\./g,'Sign in or create your InfectedNation account to open Studio.')
+  .replace(/<button id="labSignInHero" class="primary">Sign in with Google<\/button>/g,'<button id="labSignInHero" class="primary">Sign in / create account</button>')
+  .replace(/<button id="signIn" class="primary">Continue with Google<\/button>/g,'<button id="signIn" class="primary">Sign in / create account</button>')
+  .replace(/First time\? Continue with Google to create your studio account\.[^<]*/g,'Use Apple, Google, Android/passkey, or email. Every method connects to the same InfectedNation account.')
+  .replace('</head>',`<style>.infected-auth-choices{display:grid;gap:10px;margin:14px auto 18px;max-width:620px}.infected-auth-choices h3{margin:8px 0 0;font-size:14px}.infected-auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.infected-auth-grid button{width:100%}.infected-auth-grid .apple-auth{background:#fff;color:#111;border-color:#fff}@media(max-width:620px){.infected-auth-grid{grid-template-columns:1fr}}</style><script src="../auth-choices.js" defer></script></head>`);
 await fs.writeFile(labPath,lab);
 await fs.rm(path.join(out,'sw.js'),{force:true});
 

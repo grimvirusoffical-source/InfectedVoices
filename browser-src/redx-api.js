@@ -34,11 +34,13 @@ async function nationPost(path,data){
 }
 function token(){return localStorage.getItem(TOKEN_KEY)||'';}
 function setToken(value){if(value)localStorage.setItem(TOKEN_KEY,value);else localStorage.removeItem(TOKEN_KEY);}
-async function connectNation(){
+async function connectNation(options={}){
+  const flow=options.flow==='signup'?'signup':'login';
+  const method=['apple','google','android','email'].includes(options.method)?options.method:'email';
   const secret=randomHex(32);
   const request=await nationPost('/api/auth/connect/start',{appId:APP_ID,secret});
   if(typeof request.id!=='string'||!Number.isFinite(request.expires))throw Error('InfectedNation returned an invalid connection request.');
-  const url=NATION_ORIGIN+'/?connect='+encodeURIComponent(request.id)+'&app='+encodeURIComponent(APP_ID);
+  const url=NATION_ORIGIN+'/?connect='+encodeURIComponent(request.id)+'&app='+encodeURIComponent(APP_ID)+'&flow='+encodeURIComponent(flow)+'&method='+encodeURIComponent(method);
   const popup=window.open(url,'infectednation-login','popup,width=560,height=780');
   if(!popup){const error=Error('Allow popups for infectedvoices.space, then try again.');error.code='popup_blocked';throw error;}
   while(Date.now()<request.expires){
@@ -84,7 +86,7 @@ export const api={
 export const auth={
   async getUser(){const s=await session();return s.user?{...s.user,userId:s.user.id}:null;},
   isSignedIn:()=>!!me.user,
-  async signIn(){await connectNation();const s=await session();return {user:s.user};},
+  async signIn(options={}){const requested=options?.method?options:JSON.parse(sessionStorage.getItem('iv-auth-request')||'{}');sessionStorage.removeItem('iv-auth-request');await connectNation(requested);const s=await session();return {user:s.user};},
   async signOut(){
     const current=token();
     try{if(current)await request('/api/logout',{});}finally{setToken('');me={user:null};csrf='';}

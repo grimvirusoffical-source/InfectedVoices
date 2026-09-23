@@ -37,7 +37,7 @@ async function patchIOS(){
   const swiftPackagePath=path.join(root,'ios','App','CapApp-SPM','Package.swift');
   try{
     let swiftPackage=await fs.readFile(swiftPackagePath,'utf8');
-    swiftPackage=swiftPackage.replaceAll('\\\\','/');
+    swiftPackage=swiftPackage.replaceAll('\\','/');
     await fs.writeFile(swiftPackagePath,swiftPackage);
   }catch{}
 
