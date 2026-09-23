@@ -1,0 +1,41 @@
+name: EAS cloud release config
+
+on:
+  push:
+    branches: ['eas-cloud-release']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts
+      - name: Generate native iOS project
+        run: npm run native:ios
+      - name: Generate native Android project
+        run: npm run native:android
+      - name: Verify native identifiers
+        run: |
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = space.infectedvoices.studio' ios/App/App.xcodeproj/project.pbxproj
+          grep -q 'applicationId "space.infectedvoices.studio"' android/app/build.gradle
+          test -f ios/App/App/PrivacyInfo.xcprivacy
+          grep -q 'android.permission.RECORD_AUDIO' android/app/src/main/AndroidManifest.xml
+          grep -q 'path = App/App;' ios/App.xcodeproj/project.pbxproj
+          grep -q '../../../node_modules/@capacitor/app' ios/App/CapApp-SPM/Package.swift
+          if grep -q '\\\\' ios/App/CapApp-SPM/Package.swift; then echo 'Windows path separators leaked into Swift package'; exit 1; fi
+          test -f android/capacitor-cordova-android-plugins/cordova.variables.gradle
+          test -f android/app/src/main/assets/capacitor.config.json
+          grep -q 'npm run sync:ios' .eas/build/production-ios-capacitor.yml
+          grep -q 'npm run sync:android' .eas/build/production-android-capacitor.yml
+      - name: Validate EAS config files
+        run: |
+          node -e "const fs=require('fs');const e=JSON.parse(fs.readFileSync('eas.json','utf8')); if(e.build.production.ios.scheme!=='App') process.exit(1); if(e.build.production.android.buildType!=='app-bundle') process.exit(1); if(e.build.production.ios.config!=='production-ios-capacitor.yml') process.exit(1); if(e.build.production.android.config!=='production-android-capacitor.yml') process.exit(1); console.log('EAS profile structure OK')"
+          echo "Account-bound EAS config resolution is tested on the authenticated release machine, not public CI."

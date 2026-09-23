@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-const root=path.resolve(new URL('..',import.meta.url).pathname);
+import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dist=path.join(root,'dist');
 const required=['studio.html','mobile-entry.js','mobile-shell.js','mobile.css','workstation/app.js','workstation/producer-ui.js','workstation/precision-ui.js','workstation/mixer-ui.js','lab/index.html','lab/mobile-classic.js','lab/studio-runtime.js','lab/mp3-codec.js'];
 for(const rel of required){const p=path.join(dist,rel);const st=await fs.stat(p).catch(()=>null);if(!st?.isFile()||st.size<20)throw Error('Missing native web payload: '+rel);}
