@@ -35,9 +35,9 @@ Core 5 audio engine is intentionally shared. Gaps are mostly **I/O, permissions,
 | Custom / local beat import | File picker | `<input type=file>` | Share sheet / Files | SAF / Files | Entitlements may gate in Nation; studio itself supports |
 | Plugins | Desktop rules | Preset JSON only | Preset JSON only; **arbitrary JS/WASM plugins rejected** | Same | Store security boundary |
 | Account / access | Desktop account | HTTPS identity | Keychain session + HTTPS allowlist | Encrypted prefs + HTTPS | No cleartext; host switch HTTPS-only |
-| Collaboration (Core 6) | Unreleased | Not in Core 5 bootstrap | **Not bootstrapped** | **Not bootstrapped** | Explicit non-goal for store Core 5 |
+| Collaboration (Core 6) | In the 0.6.6-core6.1 vendor | Files in `dist/`; browser may keep collab | **Not bootstrapped.** Optional flag off | **Not bootstrapped.** Optional flag off | Store build rebrands the pilot and does not import it |
 | Self-updater | Windows updater | Service worker / host deploy | **App Store only** — no sideload studio JS | **Play only** | Do not reintroduce web updater in Cap |
-| Payments in-app | Stripe OK on web/desktop | Stripe OK | **No Stripe CTA** unless StoreKit IAP | **No Play Billing CTA** unless Billing Library | Review notes: free of external digital purchase CTAs for now |
+| Payments in-app | Stripe OK on web/desktop | Stripe OK on the browser host | Studio Plus via StoreKit. No Stripe button | Studio Plus via Play Billing. No Stripe button | Product `infectedvoices.studio.monthly` |
 | Deep link studio | n/a | URL | `infectedvoices://studio` | same | Validated by app bridge |
 | Background / audio session | Full | Browser suspend risk | Needs AVAudioSession QA | Needs AudioFocus QA | Real device only |
 
@@ -51,16 +51,20 @@ To claim “mobile = Windows + browser”:
 2. Mic → record → InfectedTune/Pocket/GRIM → export **WAV and MP3** works on physical iPhone + Android.
 3. Export path uses native share; show clear error if over **256 MB**.
 4. Touch UI: phone single-column, tablet/landscape expanded (already in map) — polish with Nation house tokens only if embedded under Nation; standalone Cap keeps Infected Voices chrome.
-5. No Core 6 collab in store builds.
-6. Billing: keep store builds free of Stripe buttons until IAP/Play Billing wired.
+5. Core 6 stays in the payload and stays unbootstrapped unless a flag is switched on.
+6. Billing: Studio Plus uses the store. No Stripe button on iOS or Android.
 
 ## Known intentional deltas (OK)
 
 - Updater mechanism (store vs Windows)
 - 256 MB per-file export safety on mobile
 - Plugin allowlist stricter on mobile
-- No Core 6 collab bootstrap
-- Purchase CTAs deferred for App Review / Play policy
+- No Core 6 collab bootstrap (files remain; flag is off)
+- No Stripe purchase button on iOS or Android
+- Windows 0.3.0 DLL, CLAP, and updater
+- ChordGuide and InfectedCoach
+
+Expanded inventory: `docs/STUDY-infectedvoices-merge-gaps.md`.
 
 ## Not the same as Ultimate
 
