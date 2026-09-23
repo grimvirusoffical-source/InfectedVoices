@@ -1,35 +1,49 @@
-import {PRO_FEATURES, BASIC_FEATURES, canUse, claimTrial, featureById, lockBody, readStudioPlus, resolveTier, trialUsed} from './entitlements.js';
+import {PRO_FEATURES, BASIC_FEATURES, BASIC_PLUS, SUBSCRIBE_CTA, TRIAL_CTA, accessState, canUse, entitlementKey, featureById, formatTrialEnd, lockBody, startTrial, storeBillingReady} from './entitlements.js';
 
 const COACH = [
-  {id:'record', view:'record', title:'Record', body:'Hit REC and spit a take. Headphones help.', cta:'Record a take', run:'recordTake'},
-  {id:'loop', view:'record', title:'Loop', body:'Loop a bar range, then record. Loop+Rec stays on while both are running.', cta:'Arm the loop', run:'armLoop'},
-  {id:'tune', view:'tune', title:'Tune', body:'Snap pitch to the key. Start with Auto-Tune — go deeper anytime.', cta:'Auto-tune take', run:'autoTune'},
-  {id:'pocket', view:'tune', title:'Pocket', body:'Assist stays inside ±80 ms. Precision Pocket is on Basic.', cta:'Open Pocket', feature:'precision'},
-  {id:'mix', view:'mix', title:'Mix', body:'One tap balances levels and loudness. Open Mixer to tweak.', cta:'One-click mix', run:'smartMix'},
-  {id:'lab', view:'mix', title:'Project Lab', body:'Stem gain, offset, and the take vault are on Basic.', cta:'Open Project Lab', feature:'project-lab'},
-  {id:'producer', view:'mix', title:'Producer', body:'GRIM, Precision, and Core 5 Producer are on Basic.', cta:'Open Producer', feature:'core5'},
-  {id:'export', view:'export', title:'Export', body:'Bounce WAV or MP3. Free export is 16-bit. Stems need Pro.', cta:'Export WAV', run:'exportWav'}
+  {id:'prepare', view:'home', title:'Prepare', body:'Import a beat to set the grid and BPM. Lead, beat, and bus stay available in Studio.', cta:'Import a beat', run:'prepareSong'},
+  {id:'record', view:'record', title:'Record', body:'Record a verse with count-in. Aim lead peaks around −12 to −6 dBFS. Headphones help.', cta:'Record a verse', run:'recordTake'},
+  {id:'comp', view:'record', title:'Comp', body:'Pick the best take. Clip gain, fades, and take lanes stay open in Studio.', cta:'Open takes', run:'openComp'},
+  {id:'tune', view:'tune', title:'Tune', body:'Local InfectedTune uses medium correction. Precision Tune — Included in Basic $20.', cta:'Preview tune', run:'autoTune'},
+  {id:'timing', view:'tune', title:'Timing', body:'Conservative pocket stays inside ±80 ms. Preview, then Keep. Precision Pocket — Included in Basic $20.', cta:'Preview timing', run:'lockBeat'},
+  {id:'mix', view:'mix', title:'Mix', body:'Balance vocal and beat gain before effects. The mixer, GRIM, and sidechain stay in Studio.', cta:'Balance to beat', run:'balanceToBeat'},
+  {id:'master', view:'mix', title:'Master', body:'Free keeps a gentle bus. Core 5 integrated LUFS and true peak — Included in Basic $20. The ceiling starts at −1.0 dBTP.', cta:'Open master', run:'openMaster'},
+  {id:'export', view:'export', title:'Export', body:'The delivery note prints integrated LUFS, true peak, sample rate, bit depth, and BPM. Free export is 16-bit. Stems — Included in Pro $40.', cta:'Export song', run:'exportWav'}
 ];
 const CHECKS = [
+  {id:'prepare', label:'Prepare', view:'home'},
+  {id:'record', label:'Record', view:'record'},
+  {id:'tune', label:'Tune', view:'tune'},
+  {id:'mix', label:'Mix', view:'mix'},
+  {id:'master', label:'Master', view:'mix'},
+  {id:'export', label:'Export', view:'export'}
+];
+const NAV = [
+  {id:'home', label:'Home'},
   {id:'record', label:'Record'},
   {id:'tune', label:'Tune'},
   {id:'mix', label:'Mix'},
   {id:'export', label:'Export'}
 ];
-const BASIC_ACTIONS = [
-  {id:'tune', title:'Auto-Tune', copy:'Clean pitch, still sounds like you', run:'autoTune'},
-  {id:'beat', title:'Lock to Beat', copy:'Nudge timing to the pocket', run:'lockBeat'},
-  {id:'mix', title:'Smart Mix + Master', copy:'Radio-ready loudness, fast', run:'smartMix'}
-];
-const PRO_ACTIONS = [
-  {id:'isolate', title:'Isolate Vocal', copy:'Pull the vocal stem'},
-  {id:'stems', title:'Export stems', copy:'Every track as WAV'}
+const HOME_ACTIONS = [
+  {title:'Auto-Tune', copy:'Clean pitch, still sounds like you', run:'autoTune', advanced:'tune'},
+  {title:'Lock to Beat', copy:'Nudge timing to the pocket', run:'lockBeat', advanced:'beat'},
+  {title:'Smart Mix + Master', copy:'Radio-ready loudness, fast', run:'smartMix', advanced:'mix'},
+  {title:'AI Auto-Tune', copy:'Model pitch on the take', ai:'ai-tune', pro:true, advanced:'tune'},
+  {title:'AI Beat-Lock', copy:'Quality-preserving on-beat', ai:'ai-beat', pro:true, advanced:'beat'},
+  {title:'AI Mix + Master', copy:'RoEx loudness when a provider is configured', ai:'ai-mix', pro:true, advanced:'mix'},
+  {title:'Isolate', copy:'Pull the vocal stem', ai:'isolate', pro:true, advanced:'producer'},
+  {title:'Export stems', copy:'Every track as WAV', run:'exportStems', pro:true, advanced:'export'}
 ];
 const GUARDS = {
   'Export aligned processed stems':'stems',
   'Export aligned dry stems':'stems',
   'Export master · 24-bit WAV':'24-bit',
   'Export unmastered · 24-bit WAV':'24-bit',
+  'Save portable project':'portable_project',
+  'Open Precision Tune editor':'precision_tune',
+  'Open Precision Pocket editor':'precision_pocket',
+  'Open Producer tools · mastering':'core5_master',
   'Open stem separation':'isolate',
   'Open parameter assistant':'ai-mix'
 };
@@ -54,6 +68,7 @@ export async function mountCreate({shell, config}) {
   let dontAgain = false;
   let clockTimer = 0;
   let toastTimer = 0;
+  let intro = {basic:null, pro:null};
 
   const rail = E('div');
   rail.className = 'iv-rail';
@@ -70,10 +85,19 @@ export async function mountCreate({shell, config}) {
   createTab.id = 'ivModeCreate';
   studioTab.id = 'ivModeStudio';
   modeSwitch.append(createTab, studioTab);
+  const brand = E('span', 'Infected Voices');
+  brand.className = 'iv-brand';
+  const planChip = E('button', 'Free');
+  planChip.type = 'button';
+  planChip.id = 'ivPlanChip';
+  planChip.className = 'iv-plan-chip';
+  planChip.onclick = () => { setMode('create'); showView('subscribe'); };
+  const toxins = E('span', 'Toxins? n/a');
+  toxins.className = 'iv-toxins';
   const more = E('button', 'More');
   more.type = 'button';
   more.id = 'ivMore';
-  rail.append(modeSwitch, more);
+  rail.append(brand, modeSwitch, planChip, toxins, more);
   const header = document.querySelector('.app-header') || document.querySelector('.mobile-classic-top') || document.body;
   header.append(rail);
 
@@ -105,7 +129,7 @@ export async function mountCreate({shell, config}) {
   nav.id = 'ivCreateNav';
   nav.className = 'iv-create-nav';
   nav.setAttribute('aria-label', 'Create steps');
-  for (const item of [{id:'home', label:'Home'}, ...CHECKS]) {
+  for (const item of NAV) {
     const button = E('button', item.label);
     button.type = 'button';
     button.dataset.view = item.id;
@@ -119,31 +143,73 @@ export async function mountCreate({shell, config}) {
     try { return JSON.parse(localStorage.getItem(storageKey(name))) ?? fallback; }
     catch { return fallback; }
   }
-  function trials() { return readJSON('trials', {}); }
   function signal() {
     const user = window.ivStudioBridge?.currentUser?.() || {};
-    const stored = trials();
-    const plus = readStudioPlus();
+    const studio = String(user.studioPlan || '').toLowerCase();
+    const trialPlan = String(user.trialPlan || '').toLowerCase();
     return {
-      plan: user.plan || plus?.plan,
+      account: accountKey,
+      studioPlan: studio === 'free' || studio === 'basic' || studio === 'pro' ? studio : undefined,
       kind: user.kind,
-      basic: user.basic === true || user.plan === 'basic' || user.tier === 'basic',
-      pro: user.pro === true || plus?.plan === 'pro',
-      verified: plus?.verified === true,
-      productId: plus?.productId || user.productId,
-      capabilities: user.capabilities,
-      basicTrialUsedAt: stored.basicTrialUsedAt || user.basicTrialUsedAt,
-      proTrialUsedAt: stored.proTrialUsedAt || user.proTrialUsedAt
+      nationPlan: user.nationPlan,
+      trialPlan: trialPlan === 'basic' || trialPlan === 'pro' ? trialPlan : undefined,
+      trialEnd: user.trialEnd || user.trialEndsAt,
+      basicTrialUsedAt: user.basicTrialUsedAt,
+      proTrialUsedAt: user.proTrialUsedAt
     };
   }
-  function tier() { return resolveTier(signal()); }
-  function startTrial(kind) {
-    const result = claimTrial(kind, trials());
-    if (!result.ok) return;
-    localStorage.setItem(storageKey('trials'), JSON.stringify(result.record));
+  function access() { return accessState(signal()); }
+  function tier() { return access().tier; }
+  function trialUsed(kind, state = access()) {
+    return kind === 'basic' ? state.basicTrialUsedAt > 0 : state.proTrialUsedAt > 0;
+  }
+  function trialEligible(kind, state = access()) {
+    if (trialUsed(kind, state)) return false;
+    if (kind === 'basic' && state.tier === 'pro') return false;
+    if (intro[kind] === false) return false;
+    return true;
+  }
+  function storeTrialMissing(error) {
+    return /not on this device|not available on this device/i.test(String(error?.message || error || ''));
+  }
+  function storeTrialIneligible(error) {
+    return /ineligible|not eligible|intro offer is not available/i.test(String(error?.message || error || ''));
+  }
+  async function beginTrial(kind) {
+    if (!trialEligible(kind)) return;
+    if (capStore && typeof window.ivStartStoreTrial === 'function') {
+      try {
+        await window.ivStartStoreTrial(kind);
+        render();
+        return;
+      } catch (error) {
+        if (storeTrialIneligible(error)) {
+          intro[kind] = false;
+          render();
+          return;
+        }
+        if (!storeTrialMissing(error) || storeBillingReady()) {
+          alert(error?.message || 'The store trial could not start.');
+          return;
+        }
+      }
+    }
+    const started = startTrial(kind, accountKey, Date.now(), {introEligible:intro[kind], tier:tier()});
+    if (!started.ok && started.reason !== 'higher') return;
     render();
   }
-  function allowed(featureId) { return canUse(featureId, {...signal(), tier: tier()}); }
+  async function refreshIntro() {
+    if (!capStore || typeof shell.storeSummary !== 'function') return;
+    try {
+      const catalog = await shell.storeSummary();
+      intro = {
+        basic: catalog?.basic?.introEligible ?? null,
+        pro: catalog?.pro?.introEligible ?? null
+      };
+      render();
+    } catch { /* Store catalog is not live yet. */ }
+  }
+  function allowed(featureId) { return canUse(featureId, signal()); }
   function loadAccount() {
     const user = window.ivStudioBridge?.currentUser?.() || {};
     accountKey = String(user.userId || user.id || user.email || 'device');
@@ -164,6 +230,16 @@ export async function mountCreate({shell, config}) {
     return false;
   }
   function arrangement() { return !!document.getElementById('steps'); }
+  function planChipLabel() {
+    const state = access();
+    if (state.trialPlan && state.trialEnd > Date.now()) {
+      const days = Math.max(1, Math.ceil((state.trialEnd - Date.now()) / 86400000));
+      return (state.trialPlan === 'pro' ? 'Pro trial' : 'Basic trial') + ' · ' + days + 'd';
+    }
+    if (state.tier === 'pro') return 'Pro';
+    if (state.tier === 'basic') return 'Basic';
+    return 'Free';
+  }
   function allDone() { return CHECKS.every(item => checks[item.id]); }
 
   function applyChrome() {
@@ -173,6 +249,7 @@ export async function mountCreate({shell, config}) {
     studioTab.setAttribute('aria-selected', mode === 'studio' ? 'true' : 'false');
     root.hidden = !(mode === 'create' && surfaceReady());
     nav.hidden = root.hidden;
+    planChip.textContent = planChipLabel();
     for (const button of nav.querySelectorAll('button')) button.classList.toggle('is-current', button.dataset.view === view);
   }
 
@@ -231,13 +308,33 @@ export async function mountCreate({shell, config}) {
     if (/fail|error|could not|not active|select a vocal|sign in|finish the current/i.test(text)) throw Error(text);
   }
 
+  async function prepareSong() {
+    setMode('studio');
+    const choose = document.getElementById('audioFiles');
+    if (choose) choose.click();
+    else clickNamed('Import audio');
+    checks.prepare = true;
+    saveChecks();
+    toastMessage('Import a beat to set the grid and BPM. Studio tracks stay available.', () => openAdvanced('beat'));
+  }
+  async function openComp() {
+    setMode('studio');
+    toastMessage('Comp in Studio. Clip gain, fades, and take lanes stay open. Create does not remove them.', () => openAdvanced('beat'));
+  }
   async function autoTune() {
     if (arrangement()) {
       selectVocal();
       await setEngine('tuneEngine', 'infected');
       clickStage(4);
       await sleep(30);
-      if (!clickNamed('Clean rap', document.getElementById('inspectorBody') || document)) throw Error('Select a vocal track, then Auto-Tune can apply the Natural preset.');
+    } else if (!document.querySelector('#presets button')) {
+      throw Error('Open a vocal preset in Classic Studio, then try Auto-Tune again.');
+    }
+    toastMessage('Tune preview is ready. Medium correction, not a hard retune. Listen, then Keep.', () => openAdvanced('tune'), keepTune);
+  }
+  async function keepTune() {
+    if (arrangement()) {
+      if (!clickNamed('Clean rap', document.getElementById('inspectorBody') || document)) throw Error('Select a vocal track, then Keep can apply the medium preset.');
       await waitIdle();
       const retune = document.querySelector('#inspectorBody input[aria-label="Retune / ms"]');
       if (retune) {
@@ -247,13 +344,13 @@ export async function mountCreate({shell, config}) {
       }
     } else {
       const preset = [...document.querySelectorAll('#presets button')].find(button => /clean|natural|rap/i.test(button.textContent));
-      if (!preset) throw Error('Open a vocal preset in Classic Studio, then try Auto-Tune again.');
+      if (!preset) throw Error('Open a vocal preset in Classic Studio, then Keep can apply it.');
       preset.click();
       await waitIdle();
     }
     checks.tune = true;
     saveChecks();
-    toastMessage('Auto-Tune applied.', () => openAdvanced('tune'));
+    toastMessage('Tune kept. Undo restores the previous settings.', () => openAdvanced('tune'));
     render();
   }
   async function lockBeat() {
@@ -310,7 +407,7 @@ export async function mountCreate({shell, config}) {
       assertStatus();
       clickStage(6);
       await sleep(30);
-      if (!clickNamed('Rap', document.getElementById('inspectorBody') || document)) throw Error('Master preset is not open.');
+      if (!clickNamed('Balanced', document.getElementById('inspectorBody') || document)) throw Error('Master preset is not open.');
       await waitIdle();
     } else {
       const master = document.getElementById('master');
@@ -320,7 +417,7 @@ export async function mountCreate({shell, config}) {
     }
     checks.mix = true;
     saveChecks();
-    toastMessage('Smart Mix + Master applied.', () => openAdvanced('mix'));
+    toastMessage('Smart Mix + Master previewed the Balanced bus at a −1 dB ceiling. Undo restores the previous master.', () => openAdvanced('mix'));
     render();
   }
   async function exportWav() {
@@ -340,7 +437,8 @@ export async function mountCreate({shell, config}) {
     }
     checks.export = true;
     saveChecks();
-    toastMessage('Export started.', () => openAdvanced('export'));
+    const bitsLabel = bits === 24 ? '48 kHz · 24-bit' : '44.1 kHz · 16-bit';
+    toastMessage('Export started. Delivery note: integrated LUFS, true peak, sample rate, ' + bitsLabel + ', and BPM print on the master status. No figure is invented before the bounce.', () => openAdvanced('export'));
     render();
   }
   function exportMp3() {
@@ -395,13 +493,42 @@ export async function mountCreate({shell, config}) {
     if (!rec) throw Error('Record is not available on this screen.');
     rec.click();
   }
-  const runners = {autoTune, lockBeat, smartMix, exportWav, exportStems, recordTake, armLoop};
+  function openPocket() { openAdvanced('beat'); }
+  async function balanceToBeat() {
+    if (arrangement()) {
+      clickStage(5);
+      await sleep(30);
+      if (!clickNamed('Analyze starting balance')) throw Error('Import a beat, then Balance to beat can set starting gain.');
+      await waitIdle();
+      assertStatus();
+    }
+    checks.mix = true;
+    saveChecks();
+    toastMessage('Starting gains set from the measured tracks. This is gain staging, not an AI master. Mixer controls stay in Studio.', () => openAdvanced('mixer'));
+    render();
+  }
+  async function openMaster() {
+    if (arrangement()) clickStage(6);
+    else openAdvanced('master');
+    checks.master = true;
+    saveChecks();
+    if (allowed('core5_master')) {
+      toastMessage('Master stage is open. Ceiling starts at −1.0 dBTP. Core 5 prints integrated LUFS and true peak after the bounce. Do not chase one LUFS number.', () => openAdvanced('master'));
+    } else {
+      toastMessage('Gentle bus is open. Core 5 integrated LUFS and true peak — Included in Basic $20. Studio master controls stay available.', () => openAdvanced('master'));
+    }
+  }
+  const runners = {autoTune, lockBeat, smartMix, exportWav, exportStems, recordTake, armLoop, openPocket, prepareSong, openComp, balanceToBeat, openMaster};
 
   function toastMessage(text, advanced, keep) {
     toast.hidden = false;
     toast.replaceChildren();
     toast.append(E('p', text));
     if (keep) {
+      const preview = E('button', 'Preview');
+      preview.type = 'button';
+      preview.className = 'ghost';
+      preview.onclick = () => toastMessage(text, advanced, keep);
       const commit = E('button', 'Keep');
       commit.type = 'button';
       commit.className = 'primary';
@@ -410,7 +537,11 @@ export async function mountCreate({shell, config}) {
         try { await keep(); }
         catch (error) { alert(error.message); }
       };
-      toast.append(commit);
+      const undo = E('button', 'Undo');
+      undo.type = 'button';
+      undo.className = 'ghost';
+      undo.onclick = () => { toast.hidden = true; };
+      toast.append(preview, commit, undo);
     }
     const link = E('button', 'Open advanced settings');
     link.type = 'button';
@@ -432,10 +563,10 @@ export async function mountCreate({shell, config}) {
     head.className = 'dialog-top iv-sheet-top';
     const titles = E('div');
     titles.className = 'iv-sheet-titles';
-    const basicGate = BASIC_FEATURES.some(feature => feature.id === featureId);
+    const basicGate = BASIC_PLUS.includes(entitlementKey(featureId));
     const kicker = E('p', basicGate ? 'Basic' : 'Pro');
     kicker.className = 'iv-kicker';
-    titles.append(kicker, E('h2', basicGate ? 'Unlock with Basic' : 'Unlock with Pro'));
+    titles.append(kicker, E('h2', basicGate ? 'Unlock Basic' : 'Unlock Pro'));
     const close = E('button', 'Close');
     close.type = 'button';
     close.className = 'iv-sheet-close';
@@ -444,28 +575,29 @@ export async function mountCreate({shell, config}) {
     head.append(titles, close);
     const body = E('div');
     body.className = 'mobile-native-body';
-    body.append(E('p', lockBody(feature?.name || 'This feature', featureId)));
+    body.append(E('p', (feature?.name || 'This feature') + (basicGate ? ' needs Basic. ' : ' needs Pro. ') + lockBody(feature?.name || 'This feature', featureId)));
     const list = E('ul');
     list.className = 'iv-perks';
     for (const item of (basicGate ? BASIC_FEATURES : PRO_FEATURES)) list.append(E('li', item.name));
     body.append(list);
     const actions = E('div');
     actions.className = 'iv-sheet-actions';
-    const buy = E('button', basicGate ? 'Get Basic — $20' : 'Get Pro — $40');
+    const buy = E('button', basicGate ? SUBSCRIBE_CTA.basic : SUBSCRIBE_CTA.pro);
     buy.type = 'button';
     buy.className = 'primary';
     buy.onclick = () => {
       lock.close();
-      if (!basicGate && !showStripe) openStore();
+      if (capStore) openStore(basicGate ? 'basic' : 'pro');
       else { showView('subscribe'); setMode('create'); }
     };
     actions.append(buy);
-    const trialKind = basicGate ? 'basic' : 'pro';
-    const trialKey = trialKind === 'pro' ? 'proTrialUsedAt' : 'basicTrialUsedAt';
-    if (!trialUsed(signal()[trialKey]) && tier() === 'free') {
-      const trial = E('button', trialKind === 'pro' ? 'Start 7-day Pro trial' : 'Start 7-day Basic trial');
+    const paid = basicGate ? 'basic' : 'pro';
+    const state = access();
+    if (trialEligible(paid, state)) {
+      const trial = E('button', TRIAL_CTA[paid]);
       trial.type = 'button';
-      trial.onclick = () => { lock.close(); startTrial(trialKind); };
+      trial.className = 'ghost';
+      trial.onclick = () => { lock.close(); beginTrial(paid); };
       actions.append(trial);
     }
     const later = E('button', 'Maybe later');
@@ -477,13 +609,14 @@ export async function mountCreate({shell, config}) {
     lock.append(head, body);
     if (!lock.open) lock.showModal();
   }
-  async function openWeb() {
-    const origin = String(config.serverOrigin || 'https://infectedvoices.space').replace(/\/$/, '');
-    await shell.openExternal(origin + '/#account');
+  function openStore(tier) {
+    if (typeof window.ivOpenNativeStore === 'function') window.ivOpenNativeStore(tier);
   }
-  function openStore() {
-    if (typeof window.ivOpenNativeStore === 'function') window.ivOpenNativeStore();
-    else openWeb();
+  function openPublicGet() {
+    const origin = String(config.nationOrigin || 'https://nation.infectedvoices.space').replace(/\/+$/, '');
+    const url = origin + '/get';
+    if (typeof shell.openExternal === 'function') shell.openExternal(url);
+    else window.open(url, '_blank', 'noopener');
   }
   function openProjectLab() {
     if (!allowed('project-lab')) return openLock('project-lab');
@@ -501,18 +634,20 @@ export async function mountCreate({shell, config}) {
       ['Producer', gate('core5', () => openAdvanced('producer'))],
       ['GRIM rack', gate('grim', () => openAdvanced('producer'))],
       ['Precision Tune', gate('precision', () => openAdvanced('tune'))],
+      ['Precision Pocket', gate('precision_pocket', () => openAdvanced('beat'))],
       ['Project Lab', gate('project-lab', () => { location.href = (arrangement() ? 'index.html' : '../index.html') + '#lab'; })],
       ['Pocket', () => { moreDialog.close(); openAdvanced('beat'); }],
       ['Plugins', () => { moreDialog.close(); setMode('studio'); document.getElementById('pluginsTab')?.click(); }],
       ['Release & connect', () => { moreDialog.close(); setMode('studio'); document.getElementById('integrationsTab')?.click(); }],
       ['AI tools', () => { moreDialog.close(); setMode('studio'); document.getElementById('aiTab')?.click(); }],
-      ['Mastering', gate('core5', () => openAdvanced('master'))],
+      ['Mastering', gate('core5_master', () => openAdvanced('master'))],
       ['Export', () => { moreDialog.close(); showView('export'); setMode('create'); }],
       ['Tutorial', () => { moreDialog.close(); setMode('studio'); document.getElementById('tutorial')?.click(); }],
       ['Saved projects', () => { moreDialog.close(); setMode('studio'); document.getElementById('openSaved')?.click(); }],
       [arrangement() ? 'Classic Studio' : 'Arrangement Studio', () => { location.href = arrangement() ? 'lab/index.html' : '../studio.html'; }],
       ['Vocal Lab', () => { location.href = arrangement() ? 'index.html' : '../index.html'; }],
       ['Subscribe', () => { moreDialog.close(); setMode('create'); showView('subscribe'); }],
+      ['Get the apps', () => { moreDialog.close(); openPublicGet(); }],
       ['Studio Plus', () => { moreDialog.close(); openStore(); }]
     ];
     moreDialog.replaceChildren();
@@ -551,16 +686,25 @@ export async function mountCreate({shell, config}) {
     if (!moreDialog.open) moreDialog.showModal();
   }
 
-  function card(title, copy, onClick, {pro = false} = {}) {
+  function card(title, copy, onClick, {pro = false, advanced} = {}) {
+    const article = E('article');
+    article.className = 'iv-cta' + (pro ? ' is-pro' : '');
     const button = E('button');
     button.type = 'button';
-    button.className = 'iv-cta' + (pro ? ' is-pro' : '');
     const heading = E('strong', title);
     const line = E('span', copy);
     button.append(heading, line);
-    if (pro) button.append(E('em', 'Pro'));
     button.onclick = onClick;
-    return button;
+    article.append(button);
+    if (pro) article.append(E('em', 'Pro'));
+    if (advanced) {
+      const ghost = E('button', 'Open advanced');
+      ghost.type = 'button';
+      ghost.className = 'ghost';
+      ghost.onclick = () => openAdvanced(advanced);
+      article.append(ghost);
+    }
+    return article;
   }
   function render() {
     applyChrome();
@@ -583,17 +727,15 @@ export async function mountCreate({shell, config}) {
     screen.append(kicker, checklist());
     const grid = E('div');
     grid.className = 'iv-cta-grid';
-    for (const action of BASIC_ACTIONS) grid.append(card(action.title, action.copy, () => runAction(action.run)));
-    for (const action of PRO_ACTIONS) {
-      grid.append(card(action.title, action.copy, () => action.id === 'isolate' ? openAi('isolate') : runAction('exportStems'), {pro:true}));
+    for (const action of HOME_ACTIONS) {
+      const go = action.ai ? () => openAi(action.ai) : () => runAction(action.run);
+      grid.append(card(action.title, action.copy, go, {pro:!!action.pro, advanced:action.advanced}));
     }
-    const note = E('p', 'Sounds good fast — tweak later in Studio');
-    note.className = 'iv-note';
     const open = E('button', 'Open full Studio');
     open.type = 'button';
     open.className = 'primary iv-wide';
     open.onclick = () => setMode('studio');
-    screen.append(grid, note, open);
+    screen.append(grid, open);
     return screen;
   }
   function checklist() {
@@ -617,7 +759,7 @@ export async function mountCreate({shell, config}) {
       mark.className = 'iv-box';
       mark.setAttribute('aria-hidden', 'true');
       button.prepend(mark);
-      button.onclick = () => showView(item.id);
+      button.onclick = () => showView(item.view || item.id);
       list.append(button);
     }
     box.append(list);
@@ -686,7 +828,9 @@ export async function mountCreate({shell, config}) {
     const screen = E('div');
     screen.className = 'iv-screen';
     screen.append(E('h2', 'Export'));
-    const bits = allowed('24-bit') ? '24-bit' : '16-bit';
+    const bits = allowed('24-bit') ? (arrangement() ? '44.1 kHz · 24-bit' : '48 kHz · 24-bit') : '44.1 kHz · 16-bit';
+    const heard = document.getElementById('status')?.textContent || '';
+    const delivery = heard.startsWith('Delivery note:') ? heard : 'Delivery note prints integrated LUFS, true peak, sample rate, bit depth, and BPM after export. No loudness figure is invented before the bounce.';
     const wav = E('button', 'Export ' + bits + ' WAV');
     wav.type = 'button';
     wav.id = 'ivExportWav';
@@ -696,7 +840,10 @@ export async function mountCreate({shell, config}) {
     mp3.type = 'button';
     mp3.className = 'iv-wide';
     mp3.onclick = exportMp3;
-    screen.append(wav, mp3, card('Export stems', 'Every track as WAV', () => runAction('exportStems'), {pro:true}));
+    const note = E('p', delivery);
+    note.id = 'ivDeliveryNote';
+    note.className = 'iv-sheet-meta';
+    screen.append(wav, mp3, card('Export stems', 'Every track as WAV', () => runAction('exportStems'), {pro:true}), note);
     return screen;
   }
   function subscribeView() {
@@ -707,26 +854,30 @@ export async function mountCreate({shell, config}) {
     screen.append(kicker, E('h2', 'Free, Basic, and Pro'));
     const plans = E('div');
     plans.className = 'iv-plans';
-    plans.append(planCard('free', 'Free', '$0', ['Record and arrange', 'Export master 16-bit WAV', 'Classic MP3']));
-    plans.append(planCard('basic', 'Basic', '$20', ['GRIM, Precision Tune, Core 5 Producer', 'Smart Mix + Master and Project Lab', '48 kHz / 24-bit WAV']));
+    plans.append(planCard('free', 'Free', 'Included', ['Record and arrange', 'Local InfectedTune and Pocket', 'Core 3 mix', 'MP3 and 16-bit WAV']));
+    plans.append(planCard('basic', 'Basic', '$20', BASIC_FEATURES.map(feature => feature.name)));
     plans.append(planCard('pro', 'Pro', '$40', PRO_FEATURES.map(feature => feature.name)));
     screen.append(plans);
+    const upsell = E('p', 'Free upgrades to Basic for the full local pro studio. Basic upgrades to Pro for AI, stems, and isolation.');
+    upsell.className = 'iv-note';
+    screen.append(upsell);
     if (!showStripe) {
-      const meta = E('p', 'iPhone and Android Pro uses Apple In-App Purchase or Google Play Billing. Stripe is not used inside the mobile apps.');
+      const meta = E('p', 'iPhone and Android Basic and Pro use Apple In-App Purchase or Google Play Billing. Stripe is not used inside the mobile apps. Free has no in-app product.');
       meta.className = 'iv-sheet-meta';
       screen.append(meta);
     }
     const manage = E('button', 'Manage');
     manage.type = 'button';
     manage.className = 'ghost iv-wide';
-    manage.onclick = () => showStripe ? openWeb() : openStore();
+    manage.onclick = () => openStore();
     screen.append(manage);
     return screen;
   }
   function planCard(id, title, price, lines) {
-    const current = tier() === id;
+    const state = access();
+    const current = state.tier === id;
     const article = E('article');
-    article.className = 'iv-plan' + (id === 'basic' ? ' is-raised' : '') + (id === 'pro' && tier() !== 'pro' ? ' is-featured' : '');
+    article.className = 'iv-plan' + (id === 'basic' ? ' is-raised' : '') + (id === 'pro' && state.tier !== 'pro' ? ' is-featured' : '');
     article.append(E('h3', title), E('p', price));
     const list = E('ul');
     for (const line of lines) list.append(E('li', line));
@@ -736,29 +887,29 @@ export async function mountCreate({shell, config}) {
       button.type = 'button';
       button.disabled = true;
       article.append(button);
-    } else if (id === 'pro') {
-      const button = E('button', 'Get Pro — $40');
-      button.type = 'button';
-      button.className = 'primary';
-      button.onclick = () => showStripe ? openWeb() : openStore();
-      article.append(button);
-      article.append(trialButton('pro'));
-    } else if (id === 'basic') {
-      const button = E('button', showStripe ? 'Get Basic — $20' : 'On web/desktop');
-      button.type = 'button';
-      button.onclick = () => openWeb();
-      article.append(button);
-      article.append(trialButton('basic'));
+      if (state.trialPlan === id && state.trialEndsAt) {
+        article.append(E('p', 'Trial ends ' + formatTrialEnd(state.trialEnd || state.trialEndsAt)));
+      } else if (id === 'free') {
+        article.append(E('p', 'Free stays on this account. It is not a trial.'));
+      }
+    } else if (id === 'pro' || (id === 'basic' && state.tier !== 'pro')) {
+      article.append(purchaseButton(SUBSCRIBE_CTA[id], id));
+      if (trialEligible(id, state)) article.append(trialButton(id));
     }
     return article;
   }
+  function purchaseButton(label, plan) {
+    const button = E('button', label);
+    button.type = 'button';
+    button.className = plan === 'pro' ? 'primary' : '';
+    button.onclick = () => capStore ? openStore(plan) : showView('subscribe');
+    return button;
+  }
   function trialButton(kind) {
-    const key = kind === 'pro' ? 'proTrialUsedAt' : 'basicTrialUsedAt';
-    const button = E('button', trialUsed(signal()[key]) ? 'Trial already used' : (kind === 'pro' ? 'Start 7-day Pro trial' : 'Start 7-day Basic trial'));
+    const button = E('button', TRIAL_CTA[kind]);
     button.type = 'button';
     button.className = 'ghost iv-wide';
-    button.disabled = trialUsed(signal()[key]) || (kind === 'basic' ? tier() !== 'free' : tier() === 'pro');
-    button.onclick = () => startTrial(kind);
+    button.onclick = () => beginTrial(kind);
     return button;
   }
 
@@ -809,8 +960,8 @@ export async function mountCreate({shell, config}) {
       if (step.feature) {
         if (!allowed(step.feature)) { openLock(step.feature); return; }
         if (step.feature === 'project-lab') { openProjectLab(); return; }
-        if (step.feature === 'core5') { openAdvanced('producer'); return; }
-        openAdvanced(step.feature === 'precision' ? 'tune' : 'beat');
+        if (step.feature === 'core5' || step.feature === 'core5_automation') { openAdvanced('producer'); return; }
+        openAdvanced('beat');
         return;
       }
       if (step.run) runAction(step.run);
@@ -883,7 +1034,7 @@ export async function mountCreate({shell, config}) {
     if (button.id === 'core5Producer') return 'core5';
     if (button.id === 'exportStem') return 'stems';
     const text = button.textContent.trim();
-    if (button.closest('#steps') && /Master$/.test(text)) return 'core5';
+    if (text === 'Open Producer tools · mastering') return 'core5_master';
     if (text === 'GRIM rack' || text.startsWith('GRIM')) return 'grim';
     return GUARDS[text] || '';
   }
@@ -944,6 +1095,7 @@ export async function mountCreate({shell, config}) {
   loadAccount();
   render();
   maybeCoach();
+  refreshIntro();
   window.ivOpenLock = openLock;
   return {setMode, openCoach, openLock, tier, allowed};
 }

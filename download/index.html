@@ -5,43 +5,82 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#09090B">
   <title>Get Infected Voices</title>
-  <style>
-    :root{color-scheme:dark;--bg:#09090B;--surface:#111113;--text:#FAFAFA;--muted:#A1A1AA;--border:#27272A;--accent:#6E79D6}
-    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 Inter,ui-sans-serif,system-ui,sans-serif}
-    main{max-width:720px;margin:0 auto;padding:32px 20px 64px}
-    h1{font-size:32px;letter-spacing:-.04em;margin:0 0 8px}
-    p,li{color:var(--muted)}
-    a{color:var(--accent)}
-    article{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin:12px 0}
-    h2{margin:0 0 6px;font-size:18px}
-    code{color:var(--text)}
-  </style>
+  <link rel="stylesheet" href="/get/get.css">
 </head>
-<body>
-  <main>
-    <p>Infected Voices</p>
-    <h1>Get the app</h1>
-    <p>This page is <code>/get</code> and <code>/download</code>. It does not host raw store binaries.</p>
-    <article>
-      <h2>iPhone and iPad</h2>
-      <p>App Store only. This page does not offer an ipa.</p>
-    </article>
-    <article>
-      <h2>Android</h2>
-      <p>Google Play only. This page does not offer an aab.</p>
-    </article>
-    <article>
-      <h2>Windows</h2>
-      <p>The Windows build is signed. Its SHA-256 is published beside that installer. The GitHub source zipball is source, not the Windows app.</p>
-    </article>
-    <article>
-      <h2>Mac</h2>
-      <p>No Mac .app is published.</p>
-    </article>
-    <article>
-      <h2>Open web</h2>
-      <p><a href="/voices">Open web</a> at <code>/voices</code>.</p>
-    </article>
+<body data-windows="{{WINDOWS_URL}}" data-ios="{{APP_STORE_URL}}" data-android="{{PLAY_STORE_URL}}" data-web="{{WEB_URL}}">
+  <main class="wrap">
+    <nav class="nav" aria-label="Site">
+      <a href="/get" aria-current="page">Get</a>
+      <a href="/voices/">Features</a>
+      <a href="#plans">Pricing</a>
+      <a href="{{NATION_URL}}">Sign in</a>
+      <a href="{{WEB_URL}}">Launch</a>
+    </nav>
+    <p class="word">Infected Voices</p>
+    <h1>Make vocals that sound finished</h1>
+    <p class="lede">Record, tune, mix, and export — Create mode for one-click, Studio for full producer control.</p>
+    <section class="grid" aria-label="Platforms">
+      <article class="card" data-platform="windows">
+        <p class="badge">Recommended</p>
+        <p class="kicker">Desktop</p>
+        <h2>Windows</h2>
+        <p>Signed installer on InfectedVoices-Windows Releases. Same Create one-clicks as the browser and Cap.</p>
+        <a class="cta" href="{{WINDOWS_URL}}">Download for Windows</a>
+        <p class="sha" id="windowsSha256">{{WINDOWS_SHA256}}</p>
+        <a class="ghost" href="/get/windows">System requirements</a>
+      </article>
+      <article class="card" data-platform="ios">
+        <p class="badge">Recommended</p>
+        <p class="kicker">iPhone / iPad</p>
+        <h2>iOS</h2>
+        <p>App Store only. This page does not offer an ipa. Basic and Pro use Apple in-app purchase.</p>
+        <a class="cta" href="{{APP_STORE_URL}}">View on the App Store</a>
+        {{TESTFLIGHT}}
+        <a class="ghost" href="/get/ios">iPhone and iPad details</a>
+      </article>
+      <article class="card" data-platform="android">
+        <p class="badge">Recommended</p>
+        <p class="kicker">Phone and tablet</p>
+        <h2>Android</h2>
+        <p>Google Play only. This page does not offer an aab. Basic and Pro use Play Billing.</p>
+        <a class="cta" href="{{PLAY_STORE_URL}}">Get on Google Play</a>
+        <a class="ghost" href="/get/android">Android details</a>
+      </article>
+      <article class="card" data-platform="web">
+        <p class="badge">Recommended</p>
+        <p class="kicker">Open web · Mac</p>
+        <h2>Open in browser</h2>
+        <p>Mac uses this card. Chrome, Edge, and Safari run the same Create | Studio session. No Mac .app is published. Launch at <code>/voices/</code>.</p>
+        <a class="cta" href="{{WEB_URL}}">Launch studio</a>
+        <a class="ghost" href="/get/web">Browser details</a>
+      </article>
+    </section>
+    <section class="plans" id="plans" aria-label="Plans">
+      <article>
+        <h2>Free forever</h2>
+        <p>The ongoing floor. Local tune, pocket, Core 3, MP3, and labeled 16-bit WAV. Free export is labeled 44.1 kHz · 16-bit. Not a trial.</p>
+      </article>
+      <article>
+        <h2>Basic $20</h2>
+        <p>Full local pro studio. Basic and Pro Smart Mix defaults to 48 kHz · 24-bit. One 7-day Basic trial per account, then Free unless you subscribe.</p>
+      </article>
+      <article>
+        <h2>Pro $40</h2>
+        <p>Basic plus stems and the AI paths. One 7-day Pro trial per account.</p>
+      </article>
+    </section>
+    <p class="note">On iPhone and Android, Basic and Pro are in-app purchase only. On the web, Basic and Pro use Stripe. This hub does not take a card number.</p>
+    <footer class="footer">
+      <a href="#privacy">Privacy</a>
+      <a href="{{NATION_URL}}">Support</a>
+      <a href="{{NATION_URL}}">InfectedNation</a>
+    </footer>
+    <section id="privacy">
+      <h2>Privacy</h2>
+      <p>This page does not ask for a password. Sign in happens on InfectedNation. The Windows build is signed. Its SHA-256 is published beside that installer. The GitHub source zipball is source, not the Windows app. No Mac .app is published. <code>/get</code> and <code>/download</code> are this same hub.</p>
+    </section>
+    <a class="cta sticky" id="stickyGo" href="{{WEB_URL}}">Launch studio</a>
   </main>
+  <script src="/get/get.js"></script>
 </body>
 </html>

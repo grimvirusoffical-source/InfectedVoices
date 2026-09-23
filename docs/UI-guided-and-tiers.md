@@ -24,14 +24,14 @@ Overlay or coach marks — not a separate app.
 
 | Step | Title | Spotlight | Primary CTA | Skip |
 |------|-------|-----------|-------------|------|
-| 1 | Record | REC + mic permission | **Record a take** | Skip tour |
-| 2 | Loop | Bar-range loop | **Arm the loop** | |
-| 3 | Tune | InfectedTune / Precision | **Auto-tune take** | |
-| 4 | Pocket | Precision Pocket | **Open Pocket** | |
-| 5 | Mix | Smart Mix + Master | **One-click mix** | |
-| 6 | Project Lab | Project Lab | **Open Project Lab** | |
-| 7 | Producer | GRIM, Precision, Core 5 | **Open Producer** | |
-| 8 | Export | Export / Share | **Export WAV** | Done |
+| 1 | Prepare | Import / grid | **Import a beat** | Skip tour |
+| 2 | Record | REC + input peak | **Record a verse** | |
+| 3 | Comp | Takes | **Open takes** | |
+| 4 | Tune | Local InfectedTune | **Preview tune** | |
+| 5 | Timing | Conservative pocket | **Preview timing** | |
+| 6 | Mix | Balance to beat | **Balance to beat** | |
+| 7 | Master | Gentle bus / Core 5 | **Open master** | |
+| 8 | Export | Delivery note | **Export song** | Done |
 
 - Progress dots 1–8; Back / Next; “Don’t show again” on last step  
 - Resume coach from More → **Guided tour** anytime  
@@ -73,40 +73,27 @@ After one-click: toast + “Open advanced settings” ghost link → same underl
 | Mixer buses / EQ / sidechain | Studio → Mix tab |
 | Manual loop-while-rec, punch, comps | Arrange tools (unchanged) |
 
-Never remove menu entries for Basic tier — **lock** Pro-only actions with sheet (below).
+Panels stay visible. Lock Basic and Pro actions in the sheet. Free’s local InfectedTune and Pocket stay unlocked, with no lock icon.
 
 ---
 
-## 5. Tiers ($20 Basic vs $40 Pro)
+## 5. Tiers (Free / Basic $20 / Pro $40)
 
-| | **Basic — $20** | **Pro — $40** |
-|--|-----------------|---------------|
-| Core studio (record, arrange, classic FX) | ✓ | ✓ |
-| One-click Auto-Tune / Pocket / Smart Mix (standard) | ✓ | ✓ |
-| Export master WAV / MP3 | ✓ | ✓ |
-| **Export stems** | ✗ | ✓ |
-| **AI Mix / Master** | ✗ | ✓ |
-| **AI Auto-Tune** | ✗ | ✓ |
-| **AI Beat-Lock** | ✗ | ✓ |
-| **Vocal isolation** | ✗ | ✓ |
+Source of truth: `docs/STUDY-infectedvoices-pricing.md`.
 
-*(Wire exact entitlements to product IDs; UI labels match this table.)*
+| | **Free** | **Basic — $20** | **Pro — $40** |
+|--|----------|-----------------|---------------|
+| Record, arrange, Core 3, local InfectedTune, conservative Pocket, MP3, 16-bit WAV, walkthrough | ✓ | ✓ | ✓ |
+| Precision Tune / Pocket, GRIM, Core 5 automation and master, 24-bit WAV, Smart Mix + Master, Project Lab, portable project | ✗ | ✓ | ✓ |
+| Stems, AI mix/master, AI auto-tune, AI beat-lock, vocal isolation | ✗ | ✗ | ✓ |
 
-### Lock sheet (house pattern — same as Nation)
-```
-Title: Unlock with Pro
-Body: one sentence why (e.g. “Stem export is on Pro.”)
-Checklist of Pro perks
-[ Subscribe — $40 ] primary
-[ Continue with Basic ] ghost
-```
-No password fields. Web/desktop: Stripe Checkout. Cap store builds: **StoreKit / Play Billing only** (no Stripe CTA in Cap — review). If IAP not ready, show “Pro on web/desktop” meta + link; don’t fake paywall.
+Free’s local InfectedTune and Pocket cards do not get a lock icon. Smart Mix + Master stays visible and locks on Free.
+
+### Lock sheet
+Basic gates use “Unlock with Basic” and “Subscribe Basic $20/mo”. Pro gates use “Unlock with Pro” and “Subscribe Pro $40/mo”. Maybe later stays. Eligible accounts also see “Try Basic free for 7 days” or “Try Pro free for 7 days”. After `basicTrialUsedAt` or `proTrialUsedAt`, that trial button is hidden. An active trial shows its end date. Cap has no Stripe button and no “Pro on web/desktop” link.
 
 ### Subscribe screen
-Two cards side-by-side (≥640) / stack mobile:
-- Basic elevated lightly, Pro with accent border when featured
-- Current plan disabled CTA “Current plan”
-- Manage → portal / store subscription management
+Three cards: Free, Basic $20, Pro $40. Current plan is disabled. Free has no in-app product. Purchase buttons open the store sheet, and that sheet shows a buy button only when the catalog returns the product.
 
 ---
 

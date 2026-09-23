@@ -148,7 +148,9 @@ body.native .brand small:before,body.native .brand small::before{content:none}
 }
 .record.active{background:var(--danger)!important;color:var(--on-accent)!important;border-color:var(--danger)!important}
 .transport-buttons button{min-width:44px}
-.clock,.clock strong,.iv-clock{font-variant-numeric:tabular-nums}
+.clock,.clock strong,.iv-clock,.iv-meters{font-variant-numeric:tabular-nums}
+.iv-meters{position:sticky;bottom:0;z-index:30;display:flex;flex-wrap:wrap;gap:8px 16px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:#111113;border-top:1px solid #27272A;color:#A1A1AA;font-size:12px}
+.iv-meters span{min-height:32px;display:inline-flex;align-items:center}
 .clock strong{letter-spacing:-.04em}
 .meter{background:#27272a;height:6px;border-radius:999px}
 .meter i,#meterFill{background:var(--lime)}
@@ -451,8 +453,12 @@ body[data-device-mode=ios] .info,body[data-device-mode=android] .info,.info{widt
 .iv-tour-done{width:100%;white-space:normal}
 .iv-box{width:18px;height:18px;border:1px solid var(--iv-hairline-strong);border-radius:5px;display:inline-grid;place-items:center;color:var(--iv-accent-2);font-size:12px}
 .iv-checks button[aria-pressed="true"]{border-color:var(--accent);color:var(--text);background:var(--accent-muted)}
+.iv-brand{font-size:13px;font-weight:560;letter-spacing:-.03em;color:#fafafa;white-space:nowrap}
+.iv-plan-chip{min-height:36px;border-radius:999px;padding:0 12px;font-size:12px;letter-spacing:.02em}
+.iv-toxins{font-size:12px;color:#71717a;white-space:nowrap}
 .iv-cta-grid{display:grid;grid-template-columns:1fr;gap:8px}
-.iv-cta{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;min-height:72px;padding:12px;text-align:left;white-space:normal;position:relative}
+.iv-cta{display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:100%;min-height:72px;padding:12px;text-align:left;white-space:normal;position:relative;background:#111113;border:1px solid #27272a;border-radius:14px}
+.iv-cta > button:first-child{width:100%;min-height:44px;padding:0;border:0;background:transparent;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 .iv-cta strong{font-size:15px;letter-spacing:-.02em;color:#fafafa}
 .iv-cta span{font-size:13px;color:#a1a1aa;font-weight:450;white-space:normal}
 .iv-cta em{position:absolute;top:10px;right:10px;font-style:normal;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#c7cdf5;border:1px solid rgba(110,121,214,.5);border-radius:999px;padding:2px 6px}
@@ -498,6 +504,7 @@ body.iv-mode-create.iv-tabbar-on,body.iv-mode-create{padding-bottom:calc(var(--i
   .iv-cta-grid,.iv-plans,.iv-checks{grid-template-columns:1fr 1fr}
 }
 @media (min-width:900px){
+  .iv-plans{grid-template-columns:1fr 1fr 1fr}
   .iv-coach-scrim{background:transparent;pointer-events:none}
   .iv-coach-card{left:auto;right:max(16px,var(--iv-safe-right));bottom:auto;top:88px;width:320px;border-radius:16px;border-bottom:1px solid var(--iv-hairline-strong)}
 }

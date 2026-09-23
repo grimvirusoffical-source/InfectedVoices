@@ -34,6 +34,7 @@ import { deliverBlob } from './lib/deliver'
 import { clampPocketSec, POCKET_LIMIT_SEC } from './lib/pocket'
 import { loopRangeFromBars, secToBar } from './lib/transport'
 import { sessionCan, sessionTier } from './lib/plan'
+import { formatDeliveryNote } from './lib/delivery'
 import { QRCodeSVG } from 'qrcode.react'
 import { shiftAudioBuffer } from './lib/audioShift'
 import { STUDIO_VERSION } from './version'
@@ -142,6 +143,9 @@ export default function App() {
   const [waveformPeaks, setWaveformPeaks] = useState<number[]>([])
   const [takes, setTakes] = useState<Awaited<ReturnType<typeof listTakes>>>([])
   const [status, setStatus] = useState('Ready')
+  const [trackPeak, setTrackPeak] = useState('Track peak —')
+  const [staged, setStaged] = useState<{ note: string; previewUrl: string; apply: () => Promise<void> } | null>(null)
+  const stagedRef = useRef<typeof staged>(null)
   const [customName, setCustomName] = useState('')
   const [lanUrl, setLanUrl] = useState('')
   const [rapRate, setRapRate] = useState(1)
@@ -151,6 +155,23 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    if (!engineOn) {
+      setTrackPeak('Track peak —')
+      return
+    }
+    const timer = window.setInterval(() => {
+      const peak = engineRef.current?.samplePeakDb()
+      if (peak == null || !Number.isFinite(peak)) {
+        setTrackPeak('Track peak —')
+        return
+      }
+      const clip = peak >= -0.1 ? ' · CLIP' : ''
+      setTrackPeak(`Track peak ${peak.toFixed(1)} dBFS${clip}`)
+    }, 120)
+    return () => window.clearInterval(timer)
+  }, [engineOn])
 
   useEffect(() => {
     ;(async () => {
@@ -392,7 +413,7 @@ export default function App() {
 
   const loadPreset = (p: Preset) => {
     if (p.settings.grimOn && !sessionCan('grim')) {
-      setStatus('GRIM is on the $20 Basic plan.')
+      setStatus('GRIM is included in Basic $20.')
       return
     }
     setActivePresetId(p.id)
@@ -411,6 +432,27 @@ export default function App() {
     setStatus(`Saved preset “${name}”`)
   }
 
+
+  const clearStage = () => {
+    if (stagedRef.current?.previewUrl) URL.revokeObjectURL(stagedRef.current.previewUrl)
+    stagedRef.current = null
+    setStaged(null)
+  }
+  const stageBounce = (note: string, blob: Blob, apply: () => Promise<void>) => {
+    clearStage()
+    const previewUrl = URL.createObjectURL(blob)
+    const next = {
+      note,
+      previewUrl,
+      apply: async () => {
+        await apply()
+        clearStage()
+      },
+    }
+    stagedRef.current = next
+    setStaged(next)
+    setStatus(note)
+  }
 
   const persistAsWavTake = async (opts: {
     name: string
@@ -435,9 +477,11 @@ export default function App() {
     vocalBufRef.current = buf
     const processed = await engineRef.current.processOfflineBuffer(buf)
     const wav = (await exportMasterWav(processed, sessionTier())).blob
-    await saveTake({ name: `Offline ${file.name}`, blob: wav, kind: 'infected' })
-    setTakes(await listTakes())
-    setStatus(`Processed offline: ${file.name}`)
+    stageBounce(`Tune preview is ready for ${file.name}. Preview, then Keep. Cancel leaves the original file out of the project.`, wav, async () => {
+      await saveTake({ name: `Offline ${file.name}`, blob: wav, kind: 'infected' })
+      setTakes(await listTakes())
+      setStatus(`Tune kept: ${file.name}. The original file was not replaced.`)
+    })
   }
 
   const runPocketAssist = async (takeId: string) => {
@@ -447,14 +491,16 @@ export default function App() {
     const offset = pocketAssistOffsetSec(buf.getChannelData(0), buf.sampleRate, bpm)
     const shifted = shiftAudioBuffer(buf, offset)
     const wav = (await exportMasterWav(shifted, sessionTier())).blob
-    await saveTake({
-      name: `${take.name} (pocket ${(offset * 1000).toFixed(0)}ms)`,
-      blob: wav,
-      kind: take.kind,
-      offsetSec: offset,
+    stageBounce(`Timing preview is ready. ${ (offset * 1000).toFixed(1) } ms, inside ±${POCKET_LIMIT_SEC * 1000} ms. Preview, then Keep.`, wav, async () => {
+      await saveTake({
+        name: `${take.name} (pocket ${(offset * 1000).toFixed(0)}ms)`,
+        blob: wav,
+        kind: take.kind,
+        offsetSec: offset,
+      })
+      setTakes(await listTakes())
+      setStatus(`Timing kept at ${(offset * 1000).toFixed(1)} ms. The original take is unchanged.`)
     })
-    setTakes(await listTakes())
-    setStatus(`Pocket Assist applied ${(offset * 1000).toFixed(1)} ms (limit ±${POCKET_LIMIT_SEC * 1000} ms)`)
   }
 
   const runManualPocket = async (takeId: string) => {
@@ -464,19 +510,21 @@ export default function App() {
     const buf = await blobToAudioBuffer(take.blob)
     const shifted = shiftAudioBuffer(buf, offset)
     const wav = (await exportMasterWav(shifted, sessionTier())).blob
-    await saveTake({
-      name: `${take.name} (nudge ${(offset * 1000).toFixed(0)}ms)`,
-      blob: wav,
-      kind: take.kind,
-      offsetSec: offset,
+    stageBounce(`Timing preview is ready. Nudge ${(offset * 1000).toFixed(0)} ms, clamped to ±80 ms. Preview, then Keep.`, wav, async () => {
+      await saveTake({
+        name: `${take.name} (nudge ${(offset * 1000).toFixed(0)}ms)`,
+        blob: wav,
+        kind: take.kind,
+        offsetSec: offset,
+      })
+      setTakes(await listTakes())
+      setStatus(`Timing kept at ${(offset * 1000).toFixed(0)} ms. The original take is unchanged.`)
     })
-    setTakes(await listTakes())
-    setStatus(`Pocket nudge ${(offset * 1000).toFixed(0)} ms saved (clamped to ±80 ms)`)
   }
 
   const runSmartMix = async () => {
     if (!sessionCan('smart-mix')) {
-      setStatus('Smart Mix + Master is on the $20 Basic plan.')
+      setStatus('Smart Mix + Master is included in Basic $20.')
       return
     }
     if (!beatBuf) {
@@ -493,9 +541,11 @@ export default function App() {
     if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
     const mastered = await smartMixMaster(vocal, beatBuf)
     const rendered = await exportMasterWav(mastered, sessionTier())
-    await saveTake({ name: `SMART MIX+MASTER ${new Date().toLocaleTimeString()}`, blob: rendered.blob, kind: 'master' })
-    setTakes(await listTakes())
-    setStatus('SMART MIX+MASTER complete — vocal balanced, beat ducked, bus limited')
+    stageBounce('Mix preview is ready. Vocal balanced, beat ducked, bus limited. Preview, then Keep. This is not an AI master.', rendered.blob, async () => {
+      await saveTake({ name: `SMART MIX+MASTER ${new Date().toLocaleTimeString()}`, blob: rendered.blob, kind: 'master' })
+      setTakes(await listTakes())
+      setStatus('Smart Mix + Master kept. The source takes are unchanged.')
+    })
   }
 
   const runMicMaster = async () => {
@@ -513,9 +563,11 @@ export default function App() {
     if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
     const mastered = await micMasterMix(vocal, beatBuf)
     const wav = (await exportMasterWav(mastered, sessionTier())).blob
-    await saveTake({ name: `Mic Master ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
-    setTakes(await listTakes())
-    setStatus('Mic Master complete — check Takes + Export')
+    stageBounce('Gentle bus preview is ready. Preview, then Keep. The limiter is not slammed.', wav, async () => {
+      await saveTake({ name: `Mic Master ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
+      setTakes(await listTakes())
+      setStatus('Gentle bus kept. Source takes are unchanged.')
+    })
   }
 
   const runUltimateMaster = async () => {
@@ -533,9 +585,11 @@ export default function App() {
     if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
     const mastered = await ultimateMicMaster(vocal, beatBuf, master)
     const wav = (await exportMasterWav(mastered, sessionTier())).blob
-    await saveTake({ name: `Ultimate Mic Master ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
-    setTakes(await listTakes())
-    setStatus('Ultimate Mic Master rendered with the current loudness, ducking, width and tone')
+    stageBounce('Master preview is ready. Preview, then Keep. No finished master is written until Keep.', wav, async () => {
+      await saveTake({ name: `Ultimate Mic Master ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
+      setTakes(await listTakes())
+      setStatus('Master kept. Source takes are unchanged.')
+    })
   }
 
   const balanceMix = async () => {
@@ -582,7 +636,7 @@ export default function App() {
       const rendered = await exportMasterWav(buf, sessionTier())
       const how = await deliverBlob(rendered.blob, `${take.name}.wav`)
       const verb = how === 'shared' ? 'Shared' : 'Downloaded'
-      setStatus(`${verb} ${take.name}.wav · ${rendered.label}`)
+      setStatus(`${verb} ${take.name}.wav · ${rendered.label}. ${formatDeliveryNote({ metrics: rendered.metrics, sampleRate: rendered.sampleRate, bits: rendered.bits, bpm })}`)
       return
     }
     const mp3 = await audioBufferToMp3(buf)
@@ -607,13 +661,15 @@ export default function App() {
     setRapRate(speed)
     const stretched = await engineRef.current.stretchBufferToDuration(buf, target)
     const wav = (await exportMasterWav(stretched, sessionTier())).blob
-    await saveTake({
-      name: `${pass.name} (on-beat ${target.toFixed(2)}s)`,
-      blob: wav,
-      kind: 'pass',
+    stageBounce(`Timing preview is ready. Pass stretched to ${target.toFixed(2)} s with pitch kept. Preview, then Keep.`, wav, async () => {
+      await saveTake({
+        name: `${pass.name} (on-beat ${target.toFixed(2)}s)`,
+        blob: wav,
+        kind: 'pass',
+      })
+      setTakes(await listTakes())
+      setStatus(`Timing kept at ${target.toFixed(2)} s. The original pass is unchanged.`)
     })
-    setTakes(await listTakes())
-    setStatus(`Rap-on-Beat: pass stretched to ${target.toFixed(2)}s (Bungee, pitch kept)`)
   }
 
   if (!hostReady) {
@@ -631,7 +687,7 @@ export default function App() {
         <p className="eyebrow">Vocal Lab channel v0.4.1 · Studio {STUDIO_VERSION}</p>
         <h1>Sign in to open Studio.</h1>
         <p>
-          The recording workspace stays behind the existing account sign-in. A signed-in account is Free until Basic, Pro, or a 7-day trial. The GitHub source zipball is not the Windows installer.
+          The recording workspace stays behind the existing account sign-in. A signed-in account is Free until Basic or Pro. The GitHub source zipball is not the Windows installer.
         </p>
         {hostError && <p className="error">{hostError}</p>}
         <div className="cta-row">
@@ -717,6 +773,18 @@ export default function App() {
           </div>
         </div>
         <div className="status">{status}</div>
+        <p className="meter-readout" aria-live="polite">{trackPeak}. Aim lead peaks around −12 to −6 dBFS. Master sample peak and the delivery note print after a bounce.</p>
+        {staged && (
+          <div className="keep-bar" id="ivKeepBar">
+            <p>{staged.note}</p>
+            <audio src={staged.previewUrl} controls />
+            <div className="cta-row">
+              <button onClick={() => { const el = document.querySelector('#ivKeepBar audio'); if (el instanceof HTMLAudioElement) void el.play() }}>Preview</button>
+              <button className="primary" onClick={() => void staged.apply()}>Keep</button>
+              <button onClick={() => { clearStage(); setStatus('Undo discarded the preview. The original take is unchanged.') }}>Undo</button>
+            </div>
+          </div>
+        )}
 
         {tab === 'studio' && (
           <section className="panel">
@@ -923,7 +991,7 @@ export default function App() {
                 className={settings.grimOn ? 'primary' : ''}
                 onClick={() => {
                   if (!settings.grimOn && !sessionCan('grim')) {
-                    setStatus('GRIM is on the $20 Basic plan.')
+                    setStatus('GRIM is included in Basic $20.')
                     return
                   }
                   patchSettings({ grimOn: !settings.grimOn })
@@ -1092,7 +1160,7 @@ export default function App() {
         {tab === 'lab' && !sessionCan('project-lab') && (
           <section className="panel">
             <h2>Project Lab</h2>
-            <p className="panel-lead">Project Lab is on the $20 Basic plan. Free export is 16-bit WAV. Basic and Pro export 48 kHz / 24-bit WAV.</p>
+            <p className="panel-lead">Project Lab is included in Basic $20. Free export is 44.1 kHz · 16-bit WAV with a delivery note. Basic and Pro Smart Mix defaults to 48 kHz / 24-bit WAV.</p>
           </section>
         )}
         {tab === 'lab' && sessionCan('project-lab') && (
@@ -1226,7 +1294,7 @@ export default function App() {
                       setStatus('Paste your own RoEx key, or use Grim Beats locally')
                       return
                     }
-                    setStatus('Key saved on this device. No audio was uploaded and no credits were spent.')
+                    setStatus('provider_not_configured. No audio was uploaded, no credits were spent, and no finished master was created.')
                   }}
                 >
                   Save key, preview locally
@@ -1291,7 +1359,7 @@ export default function App() {
               {takes.length === 0 && (
                 <div className="empty">
                   <strong>No stems yet</strong>
-                  Record a take or import vocals to start mastering.
+                  Import a beat to set the grid and BPM, then record a lead.
                 </div>
               )}
             </div>

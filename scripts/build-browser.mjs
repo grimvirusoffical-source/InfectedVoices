@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { build } from 'esbuild';
+import { patchProducerDelivery } from './patch-producer-delivery.mjs';
+import { publishDownloadPages } from './download-pages.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const source=path.join(root,'app-source');
@@ -16,6 +18,7 @@ const classicSession=path.join(root,'browser-src','classic-session.js');
 execFileSync(process.execPath,[path.join(root,'scripts','build-web.mjs')],{cwd:root,stdio:'inherit'});
 await fs.rm(out,{recursive:true,force:true});
 await fs.cp(sourceWeb,out,{recursive:true});
+await patchProducerDelivery(path.join(out,'workstation','app.js'));
 await fs.writeFile(path.join(out,'package.json'),JSON.stringify({type:'module'})+'\n');
 await fs.copyFile(path.join(source,'classic-runtime.js'),path.join(out,'lab','studio-runtime.js'));
 await fs.copyFile(redxApi,path.join(out,'api.js'));
@@ -58,6 +61,8 @@ studio=studio
   .replace(/Continue with Google/g,'Sign in / create account')
   .replace(/This release is a preview; retain project backups\./g,'Keep portable project backups before major edits or updates.');
 if(!studio.includes('auth-choices.js'))studio=studio.replace('</body>','  <script src="./auth-choices.js"></script>\n</body>');
+if(!studio.includes('mobile.css'))studio=studio.replace('</head>','  <link rel="stylesheet" href="./mobile.css">\n</head>');
+if(!studio.includes('create-mount.js'))studio=studio.replace('</body>','  <script type="module" src="./create-mount.js"></script>\n</body>');
 await fs.writeFile(path.join(out,'studio.html'),studio);
 
 const workstationPath=path.join(out,'workstation','app.js');
@@ -77,6 +82,8 @@ const labPath=path.join(out,'lab','index.html');
 let lab=await fs.readFile(labPath,'utf8');
 lab=lab.replace(/<script>if\('serviceWorker'[\s\S]*?<\/script>/g,'');
 if(!lab.includes('auth-choices.js'))lab=lab.replace('</body>','  <script src="../auth-choices.js"></script>\n</body>');
+if(!lab.includes('mobile.css'))lab=lab.replace('</head>','  <link rel="stylesheet" href="../mobile.css">\n</head>');
+if(!lab.includes('create-mount.js'))lab=lab.replace('</body>','  <script type="module" src="../create-mount.js"></script>\n</body>');
 await fs.writeFile(labPath,lab);
 await fs.rm(path.join(out,'sw.js'),{force:true});
 
@@ -100,9 +107,10 @@ if(!indexText.includes('content="0.7.0"'))throw Error('Canonical studio was not 
 for(const required of ['index.html','studio.html','api.js','workstation/app.js','lab/index.html','lab/account-entry.js','favicon.svg','manifest.webmanifest']){
   await fs.access(path.join(out,required));
 }
-const downloadPage=path.join(root,'download','index.html');
-await fs.mkdir(path.join(out,'get'),{recursive:true});
-await fs.mkdir(path.join(out,'download'),{recursive:true});
-await fs.copyFile(downloadPage,path.join(out,'get','index.html'));
-await fs.copyFile(downloadPage,path.join(out,'download','index.html'));
+for(const file of ['mobile-create.js','entitlements.js','mobile.css']){
+  await fs.copyFile(path.join(root,'mobile-src',file),path.join(out,file));
+}
+await fs.copyFile(path.join(root,'browser-src','create-mount.js'),path.join(out,'create-mount.js'));
+if(!studio.includes('create-mount.js')||!lab.includes('create-mount.js'))throw Error('Browser studio is missing the shared Create chrome.');
+await publishDownloadPages(root, out);
 console.log('Prepared Infected Voices browser payload in browser-dist/');

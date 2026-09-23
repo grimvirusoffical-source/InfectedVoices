@@ -74,21 +74,32 @@ export async function mountMobileChrome(){
   let user=null;try{user=await shell.user();}catch{}
   if(!user){body.append(E('p','Sign in to InfectedNation before purchasing or restoring Studio Plus.'));return;}
   body.append(E('p','iPhone/iPad purchases use Apple In-App Purchase. Android purchases use Google Play Billing. Stripe is not used inside the mobile apps.'));
-  let ready=true;
-  try{
-    const info=await shell.storeSummary();
-    const price=info.price?(' · '+info.price):'';
-    body.append(E('h3',(info.title||'Infected Voices Studio Plus')+price));
-  }catch(e){
-    ready=false;
-    body.append(E('p','The store product is not available yet: '+e.message));
-    body.append(button('Pro on web/desktop',async()=>{const origin=String(config.serverOrigin||'https://infectedvoices.space').replace(/\/$/,'');await shell.openExternal(origin+'/#account');}));
+  let catalog=null;
+  try{catalog=await shell.storeSummary();}catch(e){catalog=null;status.textContent=e.message||'Store billing is not available on this device.';}
+  const offers=catalog?[
+    ['basic','Basic','$20',catalog.basic],
+    ['pro','Pro','$40',catalog.pro]
+  ]:[['basic','Basic','$20',null],['pro','Pro','$40',null]];
+  let any=false;
+  for(const [id,name,price,info] of offers){
+    if(info?.available){
+      any=true;
+      body.append(E('h3',(info.title||name)+(info.price?(' · '+info.price):(' · '+price))));
+      body.append(button('Get '+name+' — '+price,async()=>{
+        busy=true;status.textContent='Opening the store…';
+        try{
+          await shell.purchaseSubscription(id);
+          status.textContent='Purchase verified. Refreshing access…';
+          setTimeout(()=>location.reload(),500);
+        }catch(e){status.textContent=e.message||'The purchase could not be completed.';}
+        finally{busy=false;}
+      },true));
+    }else body.append(E('p',name+' is not on this device yet.'));
   }
-  if(!ready)return;
+  if(!any)body.append(E('p','Free has no in-app product. Basic and Pro appear here when the store catalog returns them.'));
   body.append(
-    button('Subscribe',async()=>{busy=true;status.textContent='Opening the store…';try{await shell.purchaseSubscription();status.textContent='Purchase verified. Refreshing access…';setTimeout(()=>location.reload(),500);}finally{busy=false;}},true),
-    button('Restore purchases',async()=>{busy=true;status.textContent='Checking your store account…';try{await shell.restorePurchases();status.textContent='Purchase restored and verified.';setTimeout(()=>location.reload(),500);}finally{busy=false;}}),
-    button('Manage subscription',async()=>{await shell.manageSubscription();status.textContent='Opened your platform subscription settings.';})
+    button('Restore purchases',async()=>{busy=true;status.textContent='Checking your store account…';try{await shell.restorePurchases();status.textContent='Purchase restored and verified.';setTimeout(()=>location.reload(),500);}catch(e){status.textContent=e.message||'No store purchase could be restored.';}finally{busy=false;}}),
+    button('Manage subscription',async()=>{try{await shell.manageSubscription();status.textContent='Opened your platform subscription settings.';}catch(e){status.textContent=e.message||'Store billing is not available on this device.';}})
   );
  }
  async function showUpdates(){
@@ -116,6 +127,28 @@ export async function mountMobileChrome(){
  updates.onclick=showUpdates;host.onclick=showSettings;store.onclick=showStore;account.onclick=()=>shell.openExternal((config.nationOrigin||'https://nation.infectedvoices.space')+'/');
  const attach=()=>{const b=document.getElementById('studioUpdates');if(b&&b.dataset.ivBound!=='1'){b.dataset.ivBound='1';b.onclick=showUpdates;}};
  new MutationObserver(attach).observe(document.body,{childList:true,subtree:true});attach();
+ const meters=E('div');meters.id='ivMeters';meters.className='iv-meters';meters.setAttribute('aria-label','Producer meters');
+ const trackPeak=E('span','Track peak —');trackPeak.id='ivTrackPeak';
+ const masterPeak=E('span','Master peak —');masterPeak.id='ivMasterPeak';
+ const masterLoud=E('span','LUFS — · true peak —');masterLoud.id='ivMasterLufs';
+ meters.append(trackPeak,masterPeak,masterLoud);document.body.append(meters);
+ function syncMeters(){
+  const fill=document.getElementById('meterFill');
+  const width=fill?parseFloat(fill.style.width)||0:0;
+  if(width>0){
+    const db=20*Math.log10(Math.max(1e-8,width/100));
+    trackPeak.textContent='Track peak '+db.toFixed(1)+' dBFS'+(db>=-0.1?' · CLIP':'');
+  }
+  const status=document.getElementById('status')?.textContent||'';
+  if(status.includes('Delivery note:')){
+    const sample=status.match(/sample peak [^·]+/);
+    const lufs=status.match(/integrated [^·]+/);
+    const dbtp=status.match(/true peak [^·]+/);
+    if(sample)masterPeak.textContent='Master '+sample[0];
+    masterLoud.textContent=(lufs?lufs[0]:'LUFS —')+(dbtp?' · '+dbtp[0]:'');
+  }
+ }
+ setInterval(syncMeters,250);
  const bar=E('nav');bar.className='mobile-tabbar';bar.setAttribute('aria-label','Mobile studio shortcuts');bar.hidden=true;
  const svg=(paths)=>`<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
  const icons={
@@ -146,9 +179,10 @@ export async function mountMobileChrome(){
    ['Automation',gate('core5',()=>document.getElementById('core5Producer')?.click())],
    ['Sidechain',gate('core5',()=>document.getElementById('core5Producer')?.click())],
    ['Precision Tune',gate('precision',()=>clickStage(4))],
+   ['Precision Pocket',gate('precision_pocket',()=>clickStage(3))],
    ['Project Lab',gate('project-lab',()=>{location.href='index.html#lab';})],
    ['Pocket',go(()=>clickStage(3))],
-   ['Mastering',gate('core5',()=>clickStage(6))],
+   ['Mastering',gate('core5_master',()=>clickStage(6))],
    ['Export',go(()=>clickStage(7))],
    ['Plugins',go(()=>document.getElementById('pluginsTab')?.click())],
    ['Release & connect',go(()=>document.getElementById('integrationsTab')?.click())],
@@ -231,5 +265,6 @@ export async function mountMobileChrome(){
   await mountCreate({shell,config});
   window.ivOpenNativeUpdates=showUpdates;
   window.ivOpenNativeStore=showStore;
+  window.ivStartStoreTrial=kind=>shell.purchaseSubscription(kind,'trial');
   return {updates:showUpdates,settings:showSettings,store:showStore};
 }
