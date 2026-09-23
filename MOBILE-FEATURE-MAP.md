@@ -15,7 +15,8 @@
 | LUFS / true-peak producer mastering | Included | Included |
 | WAV / stems / project ZIP export | Native share/document flow; 256 MB per-file mobile safety cap | Native share/document flow; 256 MB per-file mobile safety cap |
 | Classic Studio / MP3 encoder | Included | Included |
-| Existing account / access | Guarded device-v1 account API | Guarded device-v1 account API |
+| Existing account / access | InfectedNation handoff (Apple, Google, Android/passkey, email). Studio calls use a Bearer token | InfectedNation handoff (Apple, Google, Android/passkey, email). Studio calls use a Bearer token |
+| Studio Plus billing | Apple In-App Purchase `infectedvoices.studio.monthly`, verified with InfectedNation. No Stripe button | Google Play Billing `infectedvoices.studio.monthly` / `monthly`, verified with InfectedNation. No Stripe button |
 | Host switching | HTTPS-only Mobile Settings | HTTPS-only Mobile Settings |
 | Windows self-updater | Replaced by App Store updates | Replaced by Google Play updates |
 | Unreleased Core 6 collaboration | Not bootstrapped. Cap opens Vocal Lab, not the collaboration pilot | Not bootstrapped. Cap opens Vocal Lab, not the collaboration pilot |
@@ -30,6 +31,7 @@ Cap embeds the same Core 5 `build:web` payload as the browser. These are I/O and
 - Plugin allowlist: preset JSON only; arbitrary JS/WASM plugins are rejected
 - Store updates only (no in-app web updater)
 - Core 6 collaboration is not bootstrapped
-- No Stripe purchase CTAs on iOS or Android until StoreKit / Play Billing is wired
+- Stripe is not used inside the iOS or Android apps. Studio Plus uses the store sheet. Browser Stripe checkout stays in the browser build
+- Basic has no store product in the RedX sources. That purchase stays on web/desktop
 
 See `docs/STUDY-infectedvoices-parity.md` and `docs/UI-mobile-chrome.md`.

@@ -398,36 +398,31 @@ export async function mountCreate({shell, config}) {
     body.append(list);
     const actions = E('div');
     actions.className = 'iv-sheet-actions';
-    if (showStripe) {
-      const buy = E('button', 'Get Pro — $40');
-      buy.type = 'button';
-      buy.className = 'primary';
-      buy.onclick = () => { lock.close(); showView('subscribe'); setMode('create'); };
-      actions.append(buy);
-    } else {
-      const web = E('button', 'Pro on web/desktop');
-      web.type = 'button';
-      web.className = 'primary';
-      web.onclick = () => openWeb();
-      actions.append(web);
-    }
+    const buy = E('button', 'Get Pro — $40');
+    buy.type = 'button';
+    buy.className = 'primary';
+    buy.onclick = () => {
+      lock.close();
+      if (showStripe) { showView('subscribe'); setMode('create'); }
+      else openStore();
+    };
+    actions.append(buy);
     const later = E('button', 'Maybe later');
     later.type = 'button';
     later.className = 'ghost';
     later.onclick = () => lock.close();
     actions.append(later);
     body.append(actions);
-    if (!showStripe) {
-      const meta = E('p', 'Pro on web/desktop');
-      meta.className = 'iv-sheet-meta';
-      body.append(meta);
-    }
     lock.append(head, body);
     if (!lock.open) lock.showModal();
   }
   async function openWeb() {
     const origin = String(config.serverOrigin || 'https://infectedvoices.space').replace(/\/$/, '');
     await shell.openExternal(origin + '/#account');
+  }
+  function openStore() {
+    if (typeof window.ivOpenNativeStore === 'function') window.ivOpenNativeStore();
+    else openWeb();
   }
   function openMore() {
     const items = [
@@ -446,7 +441,8 @@ export async function mountCreate({shell, config}) {
       ['Saved projects', () => { moreDialog.close(); setMode('studio'); document.getElementById('openSaved')?.click(); }],
       [arrangement() ? 'Classic Studio' : 'Arrangement Studio', () => { location.href = arrangement() ? 'lab/index.html' : '../studio.html'; }],
       ['Vocal Lab', () => { location.href = arrangement() ? 'index.html' : '../index.html'; }],
-      ['Subscribe', () => { moreDialog.close(); setMode('create'); showView('subscribe'); }]
+      ['Subscribe', () => { moreDialog.close(); setMode('create'); showView('subscribe'); }],
+      ['Studio Plus', () => { moreDialog.close(); openStore(); }]
     ];
     moreDialog.replaceChildren();
     const head = E('div');
@@ -643,19 +639,15 @@ export async function mountCreate({shell, config}) {
     plans.append(planCard('pro', 'Pro', '$40', PRO_FEATURES.map(feature => feature.name)));
     screen.append(plans);
     if (!showStripe) {
-      const meta = E('p', 'Pro on web/desktop');
+      const meta = E('p', 'iPhone and Android Pro uses Apple In-App Purchase or Google Play Billing. Stripe is not used inside the mobile apps.');
       meta.className = 'iv-sheet-meta';
-      const link = E('button', 'Pro on web/desktop');
-      link.type = 'button';
-      link.className = 'ghost iv-wide';
-      link.onclick = () => openWeb();
-      screen.append(meta, link);
+      screen.append(meta);
     }
     const manage = E('button', 'Manage');
     manage.type = 'button';
     manage.className = 'ghost iv-wide';
-    manage.onclick = () => openWeb();
-    if (showStripe) screen.append(manage);
+    manage.onclick = () => showStripe ? openWeb() : openStore();
+    screen.append(manage);
     return screen;
   }
   function planCard(id, title, price, lines) {
@@ -671,14 +663,14 @@ export async function mountCreate({shell, config}) {
       button.type = 'button';
       button.disabled = true;
       article.append(button);
-    } else if (showStripe && id === 'pro') {
+    } else if (id === 'pro') {
       const button = E('button', 'Get Pro — $40');
       button.type = 'button';
       button.className = 'primary';
-      button.onclick = () => openWeb();
+      button.onclick = () => showStripe ? openWeb() : openStore();
       article.append(button);
-    } else if (showStripe && id === 'basic') {
-      const button = E('button', 'Get Basic — $20');
+    } else if (id === 'basic') {
+      const button = E('button', showStripe ? 'Get Basic — $20' : 'On web/desktop');
       button.type = 'button';
       button.onclick = () => openWeb();
       article.append(button);

@@ -3,6 +3,8 @@ export async function mountMobileChrome(){
  const top=document.querySelector('.account-actions')||document.body;
  const host=document.createElement('button');host.id='mobileHostSettings';host.type='button';host.textContent='Settings';host.setAttribute('aria-label','Mobile settings');top.prepend(host);
  const updates=document.createElement('button');updates.id='mobileUpdates';updates.type='button';updates.textContent='Updates';updates.setAttribute('aria-label','App store updates');top.prepend(updates);
+ const store=document.createElement('button');store.id='mobileStore';store.type='button';store.textContent='Store';store.setAttribute('aria-label','Studio Plus store');top.prepend(store);
+ const account=document.createElement('button');account.id='mobileNationAccount';account.type='button';account.textContent='Account';account.setAttribute('aria-label','InfectedNation account');top.prepend(account);
  const modal=document.createElement('dialog');modal.className='detail-dialog mobile-native-dialog';document.body.append(modal);
  const E=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
  let busy=false;
@@ -22,7 +24,9 @@ export async function mountMobileChrome(){
   return {body,status};
  }
  const button=(label,fn,primary)=>{
-  const b=E('button',label);b.type='button';if(primary)b.className='primary';
+  const b=E('button',label);b.type='button';
+  if(primary===true)b.className='primary';
+  else if(primary==='apple')b.className='apple-auth';
   b.onclick=async()=>{b.disabled=true;try{await fn();}catch(e){alert(e.message);}finally{b.disabled=false;}};
   return b;
  };
@@ -33,8 +37,51 @@ export async function mountMobileChrome(){
   return s;
  }
  function actions(...nodes){const row=E('div');row.className='iv-sheet-actions';row.append(...nodes);return row;}
+ async function authAction(flow,method){
+  busy=true;
+  try{await shell.signIn({flow,method});location.reload();}
+  finally{busy=false;}
+ }
+ function authChoices(target){
+  if(!target||target.querySelector('.infected-auth-choices'))return;
+  const box=E('section');box.className='infected-auth-choices';
+  const createTitle=E('h3','Create an InfectedNation account');
+  const create=E('div');create.className='infected-auth-grid';
+  for(const [method,label] of [['apple','Apple signup'],['google','Google signup'],['android','Android / passkey signup'],['email','Email signup']])create.append(button(label,()=>authAction('signup',method),method==='apple'?'apple':false));
+  const loginTitle=E('h3','Already have an account?');
+  const login=E('div');login.className='infected-auth-grid';
+  for(const [method,label] of [['apple','Apple login'],['google','Google login'],['android','Android / passkey login'],['email','Email login']])login.append(button(label,()=>authAction('login',method),method==='apple'?'apple':false));
+  box.append(createTitle,create,loginTitle,login);
+  target.prepend(box);
+ }
+ const loginSection=document.querySelector('#loginWall section');
+ if(loginSection){document.getElementById('signIn')?.setAttribute('hidden','');authChoices(loginSection);}
+ const classicWall=document.getElementById('labLoginWall');
+ if(classicWall){document.getElementById('labSignInHero')?.setAttribute('hidden','');authChoices(classicWall);}
  const platformLabel=config.platform==='ios'?'iPhone / iPad':config.platform==='android'?'Android':'this device';
  const storeName=config.platform==='ios'?'Apple App Store':config.platform==='android'?'Google Play':'platform app store';
+ async function showStore(){
+  const {body,status}=open('Store','Studio Plus');
+  let user=null;try{user=await shell.user();}catch{}
+  if(!user){body.append(E('p','Sign in to InfectedNation before purchasing or restoring Studio Plus.'));return;}
+  body.append(E('p','iPhone/iPad purchases use Apple In-App Purchase. Android purchases use Google Play Billing. Stripe is not used inside the mobile apps.'));
+  let ready=true;
+  try{
+    const info=await shell.storeSummary();
+    const price=info.price?(' · '+info.price):'';
+    body.append(E('h3',(info.title||'Infected Voices Studio Plus')+price));
+  }catch(e){
+    ready=false;
+    body.append(E('p','The store product is not available yet: '+e.message));
+    body.append(button('Pro on web/desktop',async()=>{const origin=String(config.serverOrigin||'https://infectedvoices.space').replace(/\/$/,'');await shell.openExternal(origin+'/#account');}));
+  }
+  if(!ready)return;
+  body.append(
+    button('Subscribe',async()=>{busy=true;status.textContent='Opening the store…';try{await shell.purchaseSubscription();status.textContent='Purchase verified. Refreshing access…';setTimeout(()=>location.reload(),500);}finally{busy=false;}},true),
+    button('Restore purchases',async()=>{busy=true;status.textContent='Checking your store account…';try{await shell.restorePurchases();status.textContent='Purchase restored and verified.';setTimeout(()=>location.reload(),500);}finally{busy=false;}}),
+    button('Manage subscription',async()=>{await shell.manageSubscription();status.textContent='Opened your platform subscription settings.';})
+  );
+ }
  async function showUpdates(){
   const {body,status}=open('Store updates','App updates');
   const block=section('Installed build','Version '+config.nativeVersion+' on '+platformLabel+'. Updates come through the '+storeName+' so signing and rollback stay with the store account.');
@@ -45,17 +92,19 @@ export async function mountMobileChrome(){
  }
  async function showSettings(){
   const {body,status}=open('Mobile settings','Account server');
-  const block=section('HTTPS origin','Projects and recordings stay on this device unless you explicitly export them. Changing account servers signs this device out. Export a project backup first. Only an HTTPS origin is accepted.');
-  const input=E('input');input.type='url';input.inputMode='url';input.autocomplete='off';input.spellcheck=false;input.value=config.serverOrigin;input.setAttribute('aria-label','Account server HTTPS origin');input.placeholder='https://';
-  const label=E('label');label.className='iv-field';const cap=E('span','Account server HTTPS origin');cap.className='iv-field-label';label.append(cap,input);
+  const block=section('HTTPS origin','Projects and recordings stay on this device unless you explicitly export or join collaboration. Only an HTTPS Studio origin is accepted.');
+  block.append(E('p','Studio: '+config.serverOrigin));
+  block.append(E('p','Identity: '+(config.nationOrigin||'https://nation.infectedvoices.space')));
+  const input=E('input');input.type='url';input.inputMode='url';input.autocomplete='off';input.spellcheck=false;input.value=config.serverOrigin;input.setAttribute('aria-label','Studio server HTTPS origin');input.placeholder='https://';
+  const label=E('label');label.className='iv-field';const cap=E('span','Studio server HTTPS origin');cap.className='iv-field-label';label.append(cap,input);
   const meta=E('p',platformLabel+' · '+config.nativeVersion+' · device-v1');meta.className='iv-sheet-meta';
   block.append(label,actions(
-   button('Check server',async()=>{status.textContent='Checking…';status.textContent=(await shell.hostCheck({serverOrigin:input.value.trim()})).message;}),
-   button('Save server & reload',async()=>{if(!confirm('Save this account server? You will be signed out if the origin changes.'))return;await shell.configure({serverOrigin:input.value.trim(),protocol:'device-v1'});},true)
+   button('Check RedXAIHost Studio',async()=>{status.textContent='Checking…';status.textContent=(await shell.hostCheck({serverOrigin:input.value.trim()})).message;}),
+   button('Save Studio server & reload',async()=>{if(!confirm('Save this Studio server? Export a project backup first if you have unsaved work.'))return;await shell.configure({serverOrigin:input.value.trim(),protocol:'device-v1'});},true)
   ),meta);
   body.append(block);
  }
- updates.onclick=showUpdates;host.onclick=showSettings;
+ updates.onclick=showUpdates;host.onclick=showSettings;store.onclick=showStore;account.onclick=()=>shell.openExternal((config.nationOrigin||'https://nation.infectedvoices.space')+'/');
  const attach=()=>{const b=document.getElementById('studioUpdates');if(b&&b.dataset.ivBound!=='1'){b.dataset.ivBound='1';b.onclick=showUpdates;}};
  new MutationObserver(attach).observe(document.body,{childList:true,subtree:true});attach();
  const bar=E('nav');bar.className='mobile-tabbar';bar.setAttribute('aria-label','Mobile studio shortcuts');bar.hidden=true;
@@ -92,6 +141,7 @@ export async function mountMobileChrome(){
    ['Saved projects',go(()=>document.getElementById('openSaved')?.click())],
    ['Classic Studio',go(()=>{location.href='lab/index.html';})],
    ['Vocal Lab',go(()=>{location.href='index.html';})],
+   ['Studio Plus',go(showStore)],
    ['Settings',go(showSettings)],
    ['App updates',go(showUpdates)]
   ]:[
@@ -102,6 +152,7 @@ export async function mountMobileChrome(){
    ['Export',go(()=>scrollTo('.panel.export'))],
    ['Arrangement Studio',go(()=>{location.href='../studio.html';})],
    ['Vocal Lab',go(()=>{location.href='../index.html';})],
+   ['Studio Plus',go(showStore)],
    ['Settings',go(showSettings)],
    ['App updates',go(showUpdates)]
   ];
@@ -163,5 +214,6 @@ export async function mountMobileChrome(){
   const {mountCreate}=await import('./mobile-create.js');
   await mountCreate({shell,config});
   window.ivOpenNativeUpdates=showUpdates;
-  return {updates:showUpdates,settings:showSettings};
+  window.ivOpenNativeStore=showStore;
+  return {updates:showUpdates,settings:showSettings,store:showStore};
 }

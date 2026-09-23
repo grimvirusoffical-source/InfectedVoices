@@ -1,4 +1,4 @@
-const NATION_ORIGIN='https://nation.infectedvoices.space';
+const NATION_ORIGIN=(typeof window!=='undefined'&&window.__INFECTEDNATION_URL)||'https://nation.infectedvoices.space';
 const APP_ID='infected-voices';
 const TOKEN_KEY='infectednation_session';
 let me={user:null},csrf='';
@@ -34,11 +34,13 @@ async function nationPost(path,data){
 }
 function token(){return localStorage.getItem(TOKEN_KEY)||'';}
 function setToken(value){if(value)localStorage.setItem(TOKEN_KEY,value);else localStorage.removeItem(TOKEN_KEY);}
-async function connectNation(){
+async function connectNation(options={}){
+  const flow=options.flow==='signup'?'signup':'login';
+  const method=['apple','google','android','email'].includes(options.method)?options.method:'email';
   const secret=randomHex(32);
   const request=await nationPost('/api/auth/connect/start',{appId:APP_ID,secret});
   if(typeof request.id!=='string'||!Number.isFinite(request.expires))throw Error('InfectedNation returned an invalid connection request.');
-  const url=NATION_ORIGIN+'/?connect='+encodeURIComponent(request.id)+'&app='+encodeURIComponent(APP_ID);
+  const url=NATION_ORIGIN+'/?connect='+encodeURIComponent(request.id)+'&app='+encodeURIComponent(APP_ID)+'&flow='+encodeURIComponent(flow)+'&method='+encodeURIComponent(method);
   const popup=window.open(url,'infectednation-login','popup,width=560,height=780');
   if(!popup){const error=Error('Allow popups for infectedvoices.space, then try again.');error.code='popup_blocked';throw error;}
   while(Date.now()<request.expires){
@@ -84,7 +86,9 @@ export const api={
 export const auth={
   async getUser(){const s=await session();return s.user?{...s.user,userId:s.user.id}:null;},
   isSignedIn:()=>!!me.user,
-  async signIn(){await connectNation();const s=await session();return {user:s.user};},
+  async signIn(options={}){const requested=options?.method?options:JSON.parse(sessionStorage.getItem('iv-auth-request')||'{}');sessionStorage.removeItem('iv-auth-request');await connectNation(requested);const s=await session();return {user:s.user};},
+  async emailLogin(opts){return emailLogin(opts);},
+  async emailSignup(fields){return emailSignup(fields);},
   async signOut(){
     const current=token();
     try{if(current)await request('/api/logout',{});}finally{setToken('');me={user:null};csrf='';}
@@ -133,3 +137,20 @@ export class StudioEvents extends EventTarget{
   }
   close(){this.closed=true;clearTimeout(this.timer);this.abort?.abort();}
 }
+
+export async function emailLogin({login,password,totpCode}){
+  const body={appId:APP_ID,email:login,username:login,login,password};
+  if(totpCode)body.totpCode=totpCode;
+  const data=await nationPost('/api/auth/login/email',body);
+  if(!data.token)throw Error(data.error||'Login failed');
+  setToken(data.token);return data.account||data;
+}
+export async function emailSignup(fields){
+  const data=await nationPost('/api/auth/signup/email',{...fields,appId:APP_ID});
+  if(!data.token)throw Error(data.error||'Signup failed');
+  setToken(data.token);return data.account||data;
+}
+export async function setupTotp(){return nationPost('/api/auth/2fa/totp/setup',{token:token()});}
+export async function enableTotp(code){return nationPost('/api/auth/2fa/totp/enable',{token:token(),code});}
+export async function disableTotp(password){return nationPost('/api/auth/2fa/totp/disable',{token:token(),password});}
+export async function setPhone2fa(phone){return nationPost('/api/auth/2fa/phone/set',{token:token(),phone});}

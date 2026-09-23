@@ -10,6 +10,7 @@ const sourceWeb=path.join(source,'source-web');
 const classic=path.join(source,'classic-source');
 const out=path.join(root,'browser-dist');
 const redxApi=path.join(root,'browser-src','redx-api.js');
+const authChoices=path.join(root,'browser-src','auth-choices.js');
 const classicSession=path.join(root,'browser-src','classic-session.js');
 
 execFileSync(process.execPath,[path.join(root,'scripts','build-web.mjs')],{cwd:root,stdio:'inherit'});
@@ -18,6 +19,7 @@ await fs.cp(sourceWeb,out,{recursive:true});
 await fs.writeFile(path.join(out,'package.json'),JSON.stringify({type:'module'})+'\n');
 await fs.copyFile(path.join(source,'classic-runtime.js'),path.join(out,'lab','studio-runtime.js'));
 await fs.copyFile(redxApi,path.join(out,'api.js'));
+await fs.copyFile(authChoices,path.join(out,'auth-choices.js'));
 
 const accountPath=path.join(classic,'account.js');
 const browserPlugin={
@@ -55,6 +57,7 @@ studio=studio
   .replace(/Sign in with Google to view and use Infected Voices\.[^<]*/g,'Sign in or create your InfectedNation account to use Infected Voices. Apple, Google, passkey and email identities all map to the same account.')
   .replace(/Continue with Google/g,'Sign in / create account')
   .replace(/This release is a preview; retain project backups\./g,'Keep portable project backups before major edits or updates.');
+if(!studio.includes('auth-choices.js'))studio=studio.replace('</body>','  <script src="./auth-choices.js"></script>\n</body>');
 await fs.writeFile(path.join(out,'studio.html'),studio);
 
 const workstationPath=path.join(out,'workstation','app.js');
@@ -73,6 +76,7 @@ await fs.writeFile(workstationPath,workstation);
 const labPath=path.join(out,'lab','index.html');
 let lab=await fs.readFile(labPath,'utf8');
 lab=lab.replace(/<script>if\('serviceWorker'[\s\S]*?<\/script>/g,'');
+if(!lab.includes('auth-choices.js'))lab=lab.replace('</body>','  <script src="../auth-choices.js"></script>\n</body>');
 await fs.writeFile(labPath,lab);
 await fs.rm(path.join(out,'sw.js'),{force:true});
 
@@ -87,7 +91,9 @@ for(const file of ['favicon.svg','bungee-processor-bundled.js','audio-processor.
   await fs.copyFile(path.join(studioOut,file),path.join(out,file));
 }
 const apiText=await fs.readFile(path.join(out,'api.js'),'utf8');
-if(!apiText.includes('infectednation_session'))throw Error('Browser account adapter was overwritten.');
+if(!apiText.includes('infectednation_session')||!apiText.includes('emailLogin')||!apiText.includes('iv-auth-request'))throw Error('Browser account adapter was overwritten.');
+const choicesText=await fs.readFile(path.join(out,'auth-choices.js'),'utf8');
+if(!choicesText.includes('Apple signup')||!studio.includes('auth-choices.js')||!lab.includes('auth-choices.js'))throw Error('Browser auth choices were not injected.');
 const indexText=await fs.readFile(path.join(out,'index.html'),'utf8');
 if(!indexText.includes('content="0.7.0"'))throw Error('Canonical studio was not copied into browser-dist.');
 

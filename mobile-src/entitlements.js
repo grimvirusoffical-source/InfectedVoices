@@ -35,7 +35,7 @@ export function featureById(id) {
   return PRO_FEATURES.find(feature => feature.id === id) || null;
 }
 
-/** StoreKit / Play Billing is not wired. Cap builds must not present a fake charge. */
+/** Entitlements never mark a charge complete. Cap purchases go through the Store sheet. */
 export function storeBillingReady() {
   return false;
 }
@@ -49,6 +49,6 @@ export function selfCheck() {
   if (!canUse('ai-tune', {tier:'basic', capabilities:{aiAssist:true}})) throw Error('Existing AI capability should pass the AI gate.');
   if (canUse('stems', {tier:'basic', capabilities:{aiAssist:true}})) throw Error('AI assist must not unlock stem export.');
   if (lockBody('Export stems') !== 'Export stems is on the $40 Pro plan.') throw Error('Lock sheet copy drifted.');
-  if (storeBillingReady()) throw Error('Store billing is not implemented.');
+  if (storeBillingReady()) throw Error('Entitlements must not mark store billing ready before a verified purchase.');
   return true;
 }
