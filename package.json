@@ -11,7 +11,9 @@
     "verify:web": "node scripts/verify-web.mjs",
     "native:android": "npm run build:web && node scripts/prepare-native.mjs android",
     "sync:android": "npm run build:web && npx cap sync android && node scripts/patch-native.mjs android",
-    "open:android": "npm run sync:android && npx cap open android"
+    "open:android": "npm run sync:android && npx cap open android",
+    "build:browser": "node scripts/build-browser.mjs",
+    "start:redx": "bun scripts/redx-browser-server.mjs"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.0",
