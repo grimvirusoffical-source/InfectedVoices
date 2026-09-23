@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite";
+import { applyStripeSubscription, emptyBilling } from "./stripe-subscription.mjs";
 import { mkdirSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,8 +21,21 @@ CREATE TABLE IF NOT EXISTS activity(
  at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS activity_account_at_idx ON activity(account_id,at);
+CREATE TABLE IF NOT EXISTS studio_billing(
+ account_id TEXT PRIMARY KEY,
+ record TEXT NOT NULL
+);
 `);
 
+function readBilling(accountId){
+  const row=db.prepare("SELECT record FROM studio_billing WHERE account_id=?").get(accountId);
+  if(!row?.record)return emptyBilling();
+  try{return {...emptyBilling(),...JSON.parse(row.record)};}catch{return emptyBilling();}
+}
+function writeBilling(accountId,record){
+  db.prepare("INSERT INTO studio_billing(account_id,record) VALUES(?,?) ON CONFLICT(account_id) DO UPDATE SET record=excluded.record")
+    .run(accountId,JSON.stringify(record));
+}
 const TYPES={
   ".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".mjs":"text/javascript; charset=utf-8",
   ".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".svg":"image/svg+xml",
@@ -138,9 +152,28 @@ async function api(req,url){
   }
   if(path==="/api/billing/checkout"&&req.method==="POST"){
     const found=await requireAccount(req);if("error" in found)return found.error;
-    const trialDays=Math.max(0,Number(process.env.IV_STRIPE_TRIAL_DAYS||7));
-    const result=await nation("/api/v1/billing/stripe/checkout",{token:found.token,appId:APP_ID,trialPeriodDays:trialDays,trial_period_days:trialDays});
+    const body=await parseBody(req);
+    const plan=body.plan==="pro"?"pro":"basic";
+    const stored=readBilling(found.account.accountId);
+    const usedAt=plan==="pro"?stored.proTrialUsedAt:stored.basicTrialUsedAt;
+    const requested=plan==="pro"?body.proTrialUsedAt:body.basicTrialUsedAt;
+    const trialDays=usedAt||requested?0:Math.max(0,Number(process.env.IV_STRIPE_TRIAL_DAYS||7));
+    const priceId=plan==="pro"?process.env.IV_STRIPE_PRICE_PRO:process.env.IV_STRIPE_PRICE_BASIC;
+    const result=await nation("/api/v1/billing/stripe/checkout",{
+      token:found.token,appId:APP_ID,plan,priceId,
+      trialPeriodDays:trialDays,trial_period_days:trialDays,
+      subscription_data:{trial_period_days:trialDays}
+    });
     return json(req,result.data,result.status);
+  }
+  if(path==="/api/billing/stripe/webhook"&&req.method==="POST"){
+    const event=await parseBody(req);
+    const object=event?.data?.object||{};
+    const accountId=String(object.metadata?.accountId||object.client_reference_id||event.accountId||"");
+    if(!accountId)return json(req,{error:"Subscription event is missing an account id."},400);
+    const next=applyStripeSubscription(readBilling(accountId),event,Date.now());
+    writeBilling(accountId,next);
+    return json(req,{ok:true,plan:next.plan,trialEnd:next.trialEnd,basicTrialUsedAt:next.basicTrialUsedAt,proTrialUsedAt:next.proTrialUsedAt});
   }
   if(path==="/api/activity"&&req.method==="POST"){
     const found=await requireAccess(req);if("error" in found)return found.error;

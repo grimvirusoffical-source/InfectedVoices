@@ -8,6 +8,7 @@ import { estimateKey } from './keyEstimate.ts'
 import { REDX_INSTALL_COMMAND, VOCAL_LAB_V040 } from '../releases.ts'
 import { formatDeliveryNote, measureDelivery } from './delivery.ts'
 import { can, resolveTier, startTrial } from './plan.ts'
+import { applyStripeSubscription } from '../../../scripts/stripe-subscription.mjs'
 
 test('scale snap holds a concert A in A major', () => {
   const shift = snapSemitones(440, 'A', 'major', 8)
@@ -82,18 +83,42 @@ test('delivery note measures a half-scale sine instead of inventing loudness', (
   assert.match(note, /48000 Hz · 16-bit · 140 BPM/)
 })
 
-test('a 7-day trial expires back to Free and does not repeat', () => {
+test('a 7-day trial is once per account and expiry drops Pro', () => {
   const future = Date.now() + 60 * 60 * 1000
   const past = Date.now() - 60 * 60 * 1000
-  assert.equal(resolveTier({ trialPlan: 'pro', trialEndsAt: future }), 'pro')
-  assert.equal(resolveTier({ trialPlan: 'pro', trialEndsAt: past }), 'free')
-  assert.equal(resolveTier({ studioPlan: 'basic', trialPlan: 'pro', trialEndsAt: past }), 'basic')
-  assert.equal(can('basic', 'stems'), false)
-  assert.equal(can('pro', 'stems'), true)
+  assert.equal(resolveTier({ trialPlan: 'pro', trialEnd: future }), 'pro')
+  assert.equal(resolveTier({ trialPlan: 'pro', trialEnd: past, proTrialUsedAt: past }), 'free')
+  assert.equal(resolveTier({ studioPlan: 'basic', trialPlan: 'pro', trialEnd: past }), 'basic')
+  assert.equal(can(resolveTier({ trialPlan: 'pro', trialEnd: past }), 'stems'), false)
   const account = 'studio-trial-test'
-  assert.equal(startTrial('basic', account).ok, true)
-  assert.equal(startTrial('basic', account).ok, false)
+  assert.equal(startTrial('basic', account).status, 200)
+  assert.equal(startTrial('basic', account).status, 409)
   assert.equal(resolveTier({ account }), 'basic')
   assert.equal(can(resolveTier({ account }), 'project_lab'), true)
   assert.equal(can(resolveTier({ account }), 'stems'), false)
+  assert.equal(startTrial('pro', 'studio-ineligible', Date.now(), { introEligible: false }).reason, 'ineligible')
+  assert.equal(resolveTier({ account: 'studio-ineligible' }), 'free')
+  assert.equal(startTrial('basic', 'studio-higher', Date.now(), { tier: 'pro' }).reason, 'higher')
+})
+
+test('stripe unpaid trial end returns to free or the lower paid plan', () => {
+  const now = Date.now()
+  const trialEnd = Math.floor((now + 7 * 24 * 60 * 60 * 1000) / 1000)
+  const started = applyStripeSubscription(null, {
+    type: 'customer.subscription.updated',
+    data: { object: { id: 'sub_pro', status: 'trialing', trial_end: trialEnd, metadata: { plan: 'pro' } } },
+  }, now)
+  assert.equal(started.plan, 'pro')
+  assert.ok(started.proTrialUsedAt)
+  const expired = applyStripeSubscription(started, {
+    type: 'customer.subscription.deleted',
+    data: { object: { id: 'sub_pro', status: 'canceled', trial_end: Math.floor(now / 1000) - 10, metadata: { plan: 'pro' } } },
+  }, now)
+  assert.equal(expired.plan, 'free')
+  assert.ok(expired.proTrialUsedAt)
+  const withBasic = applyStripeSubscription(expired, {
+    type: 'customer.subscription.updated',
+    data: { object: { id: 'sub_basic', status: 'active', metadata: { plan: 'basic' } } },
+  }, now)
+  assert.equal(withBasic.plan, 'basic')
 })

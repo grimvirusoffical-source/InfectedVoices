@@ -67,13 +67,13 @@ const TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
 const memory = new Map();
 let sessionPlan = '';
 
-export const TRIAL_COPY = {
-  basic: '7 days of Basic — then Free unless you subscribe.',
-  pro: '7 days of Pro — then Free unless you subscribe.'
-};
 export const TRIAL_CTA = {
-  basic: 'Start 7-day Basic trial',
-  pro: 'Start 7-day Pro trial'
+  basic: 'Try Basic free for 7 days',
+  pro: 'Try Pro free for 7 days'
+};
+export const SUBSCRIBE_CTA = {
+  basic: 'Subscribe Basic $20/mo',
+  pro: 'Subscribe Pro $40/mo'
 };
 
 export function entitlementKey(id) {
@@ -120,7 +120,12 @@ function stamp(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 function emptyTrial() {
-  return {basicUsed:false, proUsed:false, basicEndsAt:0, proEndsAt:0};
+  return {basicTrialUsedAt:0, proTrialUsedAt:0, basicEndsAt:0, proEndsAt:0};
+}
+function usedStamp(raw, atKey, legacyFlag) {
+  const at = stamp(raw?.[atKey]);
+  if (at) return at;
+  return raw?.[legacyFlag] === true ? 1 : 0;
 }
 export function trialAccount() {
   return storageGet('iv-active-account') || 'device';
@@ -133,19 +138,21 @@ export function readTrial(account = trialAccount()) {
     const raw = JSON.parse(storageGet(trialStorageKey(account)) || 'null');
     if (!raw || typeof raw !== 'object') return emptyTrial();
     return {
-      basicUsed: raw.basicUsed === true,
-      proUsed: raw.proUsed === true,
+      basicTrialUsedAt: usedStamp(raw, 'basicTrialUsedAt', 'basicUsed'),
+      proTrialUsedAt: usedStamp(raw, 'proTrialUsedAt', 'proUsed'),
       basicEndsAt: stamp(raw.basicEndsAt),
       proEndsAt: stamp(raw.proEndsAt)
     };
   } catch { return emptyTrial(); }
 }
 function writeTrial(account, record) {
+  const trialEnd = Math.max(record.basicEndsAt || 0, record.proEndsAt || 0) || null;
   storageSet(trialStorageKey(account), JSON.stringify({
     plan: record.proEndsAt >= record.basicEndsAt && record.proEndsAt ? 'pro' : record.basicEndsAt ? 'basic' : 'free',
-    trialEndsAt: Math.max(record.basicEndsAt || 0, record.proEndsAt || 0) || null,
-    basicUsed: record.basicUsed === true,
-    proUsed: record.proUsed === true,
+    trialEnd,
+    trialEndsAt: trialEnd,
+    basicTrialUsedAt: record.basicTrialUsedAt || null,
+    proTrialUsedAt: record.proTrialUsedAt || null,
     basicEndsAt: record.basicEndsAt || 0,
     proEndsAt: record.proEndsAt || 0
   }));
@@ -164,21 +171,28 @@ function paidPlan(signal) {
   if (sessionPlan === 'basic' || sessionPlan === 'pro') return sessionPlan;
   return '';
 }
-/** Once per account. An active window unlocks that plan. Expiry does not delete the used flag. */
-export function startTrial(kind, account = trialAccount(), now = Date.now()) {
-  if (kind !== 'basic' && kind !== 'pro') return {ok:false, reason:'unknown'};
+/**
+ * Once per account. basicTrialUsedAt / proTrialUsedAt stay after expiry.
+ * introEligible false is a store answer: do not write a local trial.
+ * A Basic trial while the account is already Pro is a no-op.
+ * The local record is the QA path only while store intro offers are not live.
+ */
+export function startTrial(kind, account = trialAccount(), now = Date.now(), options = {}) {
+  if (kind !== 'basic' && kind !== 'pro') return {ok:false, reason:'unknown', status:400};
+  if (options.introEligible === false) return {ok:false, reason:'ineligible', status:403};
+  if (kind === 'basic' && options.tier === 'pro') return {ok:false, reason:'higher', status:409};
   const record = readTrial(account);
-  if (kind === 'basic' && record.basicUsed) return {ok:false, reason:'used', record};
-  if (kind === 'pro' && record.proUsed) return {ok:false, reason:'used', record};
+  if (kind === 'basic' && record.basicTrialUsedAt) return {ok:false, reason:'used', status:409, record};
+  if (kind === 'pro' && record.proTrialUsedAt) return {ok:false, reason:'used', status:409, record};
   const ends = now + TRIAL_MS;
   const next = {
-    basicUsed: kind === 'basic' ? true : record.basicUsed,
-    proUsed: kind === 'pro' ? true : record.proUsed,
+    basicTrialUsedAt: kind === 'basic' ? now : record.basicTrialUsedAt,
+    proTrialUsedAt: kind === 'pro' ? now : record.proTrialUsedAt,
     basicEndsAt: kind === 'basic' ? ends : record.basicEndsAt,
     proEndsAt: kind === 'pro' ? ends : record.proEndsAt
   };
   writeTrial(account, next);
-  return {ok:true, record:next, ends};
+  return {ok:true, record:next, ends, status:200};
 }
 export function formatTrialEnd(ms) {
   const date = new Date(ms);
@@ -188,19 +202,24 @@ export function formatTrialEnd(ms) {
 export function accessState(signal = {}, now = Date.now()) {
   const local = readTrial(signal.account || trialAccount());
   const serverPlan = signal.trialPlan === 'basic' || signal.trialPlan === 'pro' ? signal.trialPlan : '';
-  const serverEnds = stamp(signal.trialEndsAt);
+  const serverEnds = stamp(signal.trialEnd || signal.trialEndsAt);
   const basicEndsAt = Math.max(local.basicEndsAt, serverPlan === 'basic' ? serverEnds : 0);
   const proEndsAt = Math.max(local.proEndsAt, serverPlan === 'pro' ? serverEnds : 0);
   const trialPlan = proEndsAt > now ? 'pro' : basicEndsAt > now ? 'basic' : '';
-  const trialEndsAt = trialPlan === 'pro' ? proEndsAt : trialPlan === 'basic' ? basicEndsAt : 0;
+  const trialEnd = trialPlan === 'pro' ? proEndsAt : trialPlan === 'basic' ? basicEndsAt : 0;
   const paid = paidPlan(signal);
+  const basicTrialUsedAt = Math.max(local.basicTrialUsedAt, stamp(signal.basicTrialUsedAt));
+  const proTrialUsedAt = Math.max(local.proTrialUsedAt, stamp(signal.proTrialUsedAt));
   return {
     tier: higher(paid, trialPlan),
     paid,
     trialPlan,
-    trialEndsAt,
-    basicUsed: local.basicUsed || signal.basicTrialUsed === true || (serverPlan === 'basic' && serverEnds > 0),
-    proUsed: local.proUsed || signal.proTrialUsed === true || (serverPlan === 'pro' && serverEnds > 0)
+    trialEnd,
+    trialEndsAt: trialEnd,
+    basicTrialUsedAt,
+    proTrialUsedAt,
+    basicUsed: basicTrialUsedAt > 0,
+    proUsed: proTrialUsedAt > 0
   };
 }
 
@@ -244,7 +263,10 @@ export function clientSignal(now = Date.now()) {
   return {
     studioPlan:sessionPlan || undefined,
     trialPlan:access.trialPlan || undefined,
-    trialEndsAt:access.trialEndsAt || undefined
+    trialEnd:access.trialEnd || undefined,
+    trialEndsAt:access.trialEnd || undefined,
+    basicTrialUsedAt:access.basicTrialUsedAt || undefined,
+    proTrialUsedAt:access.proTrialUsedAt || undefined
   };
 }
 
@@ -260,17 +282,22 @@ export function selfCheck() {
   if (resolveTier({demoPlan:'pro'}) !== 'free') throw Error('Bare demo flag unlocked Pro.');
   const future = Date.now() + 60 * 60 * 1000;
   const past = Date.now() - 60 * 60 * 1000;
-  if (resolveTier({trialPlan:'pro', trialEndsAt:future}) !== 'pro') throw Error('Active Pro trial did not apply.');
+  if (resolveTier({trialPlan:'pro', trialEnd:future}) !== 'pro') throw Error('Active Pro trial did not apply.');
   if (resolveTier({trialPlan:'basic', trialEndsAt:future}) !== 'basic') throw Error('Active Basic trial did not apply.');
-  if (resolveTier({trialPlan:'pro', trialEndsAt:past}) !== 'free') throw Error('Expired trial stayed Pro.');
-  if (resolveTier({studioPlan:'basic', trialPlan:'pro', trialEndsAt:past}) !== 'basic') throw Error('Expired trial removed a paid plan.');
-  if (resolveTier({studioPlan:'basic', trialPlan:'pro', trialEndsAt:future}) !== 'pro') throw Error('Pro trial did not sit above paid Basic.');
-  if (canUse('stems', {trialPlan:'basic', trialEndsAt:future})) throw Error('Basic trial unlocked a Pro tool.');
-  if (!canUse('project_lab', {trialPlan:'basic', trialEndsAt:future})) throw Error('Basic trial missed a Basic tool.');
+  if (resolveTier({trialPlan:'pro', trialEnd:past}) !== 'free') throw Error('Expired trial stayed Pro.');
+  if (resolveTier({studioPlan:'basic', trialPlan:'pro', trialEnd:past}) !== 'basic') throw Error('Expired trial removed a paid plan.');
+  if (resolveTier({studioPlan:'basic', trialPlan:'pro', trialEnd:future}) !== 'pro') throw Error('Pro trial did not sit above paid Basic.');
+  if (canUse('stems', {trialPlan:'basic', trialEnd:future})) throw Error('Basic trial unlocked a Pro tool.');
+  if (!canUse('project_lab', {trialPlan:'basic', trialEnd:future})) throw Error('Basic trial missed a Basic tool.');
+  if (canUse('stems', {trialPlan:'pro', trialEnd:past, proTrialUsedAt:past})) throw Error('Expired Pro trial still unlocked stems.');
+  const basicOnce = startTrial('basic', 'self-check-basic', Date.now());
+  if (!basicOnce.ok || !basicOnce.record.basicTrialUsedAt || startTrial('basic', 'self-check-basic', Date.now()).status !== 409) throw Error('Basic trial was not once per account.');
   const started = startTrial('pro', 'self-check', Date.now());
-  if (!started.ok || startTrial('pro', 'self-check', Date.now()).ok) throw Error('Pro trial was not once per account.');
+  if (!started.ok || !started.record.proTrialUsedAt || startTrial('pro', 'self-check', Date.now()).status !== 409) throw Error('Pro trial was not once per account.');
   if (resolveTier({account:'self-check'}) !== 'pro') throw Error('Stored trial did not resolve.');
-  if (startTrial('basic', 'self-check-basic', past).ok !== true) throw Error('Basic trial did not start.');
+  const blocked = startTrial('pro', 'self-check-ineligible', Date.now(), {introEligible:false});
+  if (blocked.ok || blocked.reason !== 'ineligible' || resolveTier({account:'self-check-ineligible'}) === 'pro') throw Error('Ineligible intro offer wrote a local Pro trial.');
+  if (startTrial('basic', 'self-check-higher', Date.now(), {tier:'pro'}).reason !== 'higher') throw Error('Basic trial was not a no-op on Pro.');
   for (const id of PRO_ONLY) {
     if (can('free', id) || can('basic', id) || !can('pro', id)) throw Error('Pro gate failed for ' + id);
   }

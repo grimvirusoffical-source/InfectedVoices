@@ -39,7 +39,7 @@ Cap embeds the same Core 5 `build:web` payload as the browser. These are I/O and
 - Core 6 files stay in the 0.6.6-core6.1 payload and are not bootstrapped. An optional flag is off
 - Service worker / PWA updater is removed from Cap and may stay on the browser deploy
 - Stripe is not used inside the iOS or Android apps. Studio Plus uses the store sheet for Basic and Pro only when the catalog returns that product. Browser Stripe checkout stays in the browser build
-- Free has no in-app product and is not a trial. Start 7-day Basic trial and Start 7-day Pro trial are once per account. Until the store intro offer is live, the app stores trialEndsAt and returns to Free when it passes
+- Free has no in-app product and is not a trial. “Try Basic free for 7 days” and “Try Pro free for 7 days” are once per account (`basicTrialUsedAt` / `proTrialUsedAt`). An ineligible StoreKit or Play intro offer hides the trial and does not write a local Pro plan. Until IAP is live, the QA record uses the same used-at stamps and expires back to Free
 - Windows DLL, CLAP, and the signed updater stay on the desktop
 - Infected ChordGuide and InfectedCoach are separate apps
 

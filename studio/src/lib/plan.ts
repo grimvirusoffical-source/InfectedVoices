@@ -54,14 +54,15 @@ type Signal = {
   socialPlan?: string
   account?: string
   trialPlan?: string
+  trialEnd?: string | number
   trialEndsAt?: string | number
-  basicTrialUsed?: boolean
-  proTrialUsed?: boolean
+  basicTrialUsedAt?: string | number
+  proTrialUsedAt?: string | number
 }
 
 type TrialRecord = {
-  basicUsed: boolean
-  proUsed: boolean
+  basicTrialUsedAt: number
+  proTrialUsedAt: number
   basicEndsAt: number
   proEndsAt: number
 }
@@ -110,7 +111,13 @@ function stamp(value: unknown) {
 }
 
 function emptyTrial(): TrialRecord {
-  return { basicUsed: false, proUsed: false, basicEndsAt: 0, proEndsAt: 0 }
+  return { basicTrialUsedAt: 0, proTrialUsedAt: 0, basicEndsAt: 0, proEndsAt: 0 }
+}
+
+function usedStamp(raw: TrialRecord & { basicUsed?: boolean; proUsed?: boolean }, atKey: 'basicTrialUsedAt' | 'proTrialUsedAt', legacy: 'basicUsed' | 'proUsed') {
+  const at = stamp(raw?.[atKey])
+  if (at) return at
+  return raw?.[legacy] === true ? 1 : 0
 }
 
 function trialAccount() {
@@ -122,8 +129,8 @@ function readTrial(account = trialAccount()): TrialRecord {
     const raw = JSON.parse(storageGet('iv-studio-trial:' + account) || 'null') as TrialRecord | null
     if (!raw || typeof raw !== 'object') return emptyTrial()
     return {
-      basicUsed: raw.basicUsed === true,
-      proUsed: raw.proUsed === true,
+      basicTrialUsedAt: usedStamp(raw, 'basicTrialUsedAt', 'basicUsed'),
+      proTrialUsedAt: usedStamp(raw, 'proTrialUsedAt', 'proUsed'),
       basicEndsAt: stamp(raw.basicEndsAt),
       proEndsAt: stamp(raw.proEndsAt),
     }
@@ -143,11 +150,11 @@ function higher(a: string, b: string): StudioPlan {
   return winner === 'basic' || winner === 'pro' ? winner : 'free'
 }
 
-/** Paid studioPlan is the floor. An active trialEndsAt can sit above it until that stamp. */
+/** Paid studioPlan is the floor. An active trialEnd can sit above it until that stamp. */
 export function resolveTier(signal: Signal = {}, now = Date.now()): StudioPlan {
   const local = readTrial(signal.account || trialAccount())
   const serverPlan = signal.trialPlan === 'basic' || signal.trialPlan === 'pro' ? signal.trialPlan : ''
-  const serverEnds = stamp(signal.trialEndsAt)
+  const serverEnds = stamp(signal.trialEnd || signal.trialEndsAt)
   const basicEndsAt = Math.max(local.basicEndsAt, serverPlan === 'basic' ? serverEnds : 0)
   const proEndsAt = Math.max(local.proEndsAt, serverPlan === 'pro' ? serverEnds : 0)
   const trialPlan = proEndsAt > now ? 'pro' : basicEndsAt > now ? 'basic' : ''
@@ -172,21 +179,33 @@ export function sessionCan(featureId: string) {
   return can(sessionTier(), featureId)
 }
 
-export function startTrial(kind: 'basic' | 'pro', account = trialAccount(), now = Date.now()) {
+export function startTrial(
+  kind: 'basic' | 'pro',
+  account = trialAccount(),
+  now = Date.now(),
+  options: { introEligible?: boolean | null; tier?: string } = {},
+) {
+  if (options.introEligible === false) return { ok: false as const, reason: 'ineligible' as const, status: 403 }
+  if (kind === 'basic' && options.tier === 'pro') return { ok: false as const, reason: 'higher' as const, status: 409 }
   const record = readTrial(account)
-  if (kind === 'basic' && record.basicUsed) return { ok: false as const, reason: 'used' }
-  if (kind === 'pro' && record.proUsed) return { ok: false as const, reason: 'used' }
+  if (kind === 'basic' && record.basicTrialUsedAt) return { ok: false as const, reason: 'used' as const, status: 409 }
+  if (kind === 'pro' && record.proTrialUsedAt) return { ok: false as const, reason: 'used' as const, status: 409 }
   const ends = now + TRIAL_MS
   const next = {
-    basicUsed: kind === 'basic' ? true : record.basicUsed,
-    proUsed: kind === 'pro' ? true : record.proUsed,
+    basicTrialUsedAt: kind === 'basic' ? now : record.basicTrialUsedAt,
+    proTrialUsedAt: kind === 'pro' ? now : record.proTrialUsedAt,
     basicEndsAt: kind === 'basic' ? ends : record.basicEndsAt,
     proEndsAt: kind === 'pro' ? ends : record.proEndsAt,
   }
+  const trialEnd = Math.max(next.basicEndsAt || 0, next.proEndsAt || 0) || null
   storageSet('iv-studio-trial:' + account, JSON.stringify({
     plan: next.proEndsAt >= next.basicEndsAt && next.proEndsAt ? 'pro' : next.basicEndsAt ? 'basic' : 'free',
-    trialEndsAt: Math.max(next.basicEndsAt || 0, next.proEndsAt || 0) || null,
-    ...next,
+    trialEnd,
+    trialEndsAt: trialEnd,
+    basicTrialUsedAt: next.basicTrialUsedAt || null,
+    proTrialUsedAt: next.proTrialUsedAt || null,
+    basicEndsAt: next.basicEndsAt,
+    proEndsAt: next.proEndsAt,
   }))
-  return { ok: true as const, ends }
+  return { ok: true as const, ends, status: 200 }
 }

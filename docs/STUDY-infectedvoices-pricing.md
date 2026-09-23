@@ -113,7 +113,38 @@ No IAP for Free. Cap: StoreKit/Play only (no Stripe CTA). Web/Windows: Stripe.
 
 ## Trial / demo
 
-Free **is** the ongoing free tier — it is not a trial, and a bare demo flag does not unlock Pro. Each account can start one 7-day Basic trial (BASIC_PLUS) and one 7-day Pro trial (full PRO). After `trialEndsAt` the account returns to Free, or to the paid plan already on the account. Cap uses the store intro offer when the product advertises one. Until IAP is live, client and server `trialEndsAt` is the QA path. Web and Windows Checkout sends `trial_period_days` when the Stripe prices exist.
+Free **is** the ongoing free tier (always available after sign-in). Paid trials are separate:
+
+| Offer | Duration | Entitlements during trial | Eligibility |
+|-------|----------|---------------------------|-------------|
+| **Basic trial** | **7 days** | Full `basic` plan | **Once per account** (identity `accountId` + store original transaction / Stripe customer) |
+| **Pro trial** | **7 days** | Full `pro` plan | **Once per account** (same uniqueness rules) |
+
+### Rules
+
+1. Free remains forever; trials never replace Free as the default floor after expiry — user falls back to **`free`** (or to Basic if they converted Basic trial → paid Basic, etc.).
+2. Starting **Pro trial** while on Free/Basic grants Pro entitlements for 7 days; after expiry without subscribe → prior paid plan if any, else Free.
+3. Starting **Basic trial** while already on Pro is a no-op (already higher).
+4. **One Basic trial + one Pro trial** per account lifetime (not once per device). Server stores `basicTrialUsedAt` / `proTrialUsedAt`.
+5. Convert during trial: subscribe to that tier (or upgrade) so billing starts at trial end with no double charge (store/Stripe handle).
+6. Until IAP/Stripe products are live: QA may use in-app “Activate Free/Basic/Pro” demo flip writing the same `plan` field — **not** for production users.
+
+### Cap (StoreKit / Play)
+
+- Prefer **introductory offer**: 7-day free trial on the Basic and Pro monthly subscriptions (`space.infectedvoices.studio.basic.monthly` / `.pro.monthly`, Android `iv_studio_basic` / `iv_studio_pro`).
+- Respect store “eligible for intro offer” APIs; if ineligible, hide trial CTA and show paid subscribe only.
+- Restore purchases must re-apply active trial/subscription from the store, then sync to identity/studio billing.
+
+### Web / Windows (Stripe)
+
+- Checkout `subscription_data.trial_period_days: 7` when starting Basic or Pro from an eligible account.
+- Or Prices with trial in Dashboard — keep one source of truth.
+- Webhook remains authoritative: `customer.subscription.*` → set `plan` + `trialEnd`; on trial end without payment → `plan: 'free'` (unless another active sub).
+
+### Subscribe CTA copy (Ui)
+
+- Free user: “Try Basic free for 7 days” / “Try Pro free for 7 days” (if eligible) + paid subscribe alternatives.
+- After trial used: “Subscribe Basic $20/mo” / “Subscribe Pro $40/mo” only.
 
 ## Stress checks
 
@@ -121,6 +152,10 @@ Free **is** the ongoing free tier — it is not a trial, and a bare demo flag do
 2. Basic: all local pro tools; AI/stems/isolation still locked  
 3. Pro: all five Pro paths work  
 4. Nation social plan never sets studio `pro` by accident  
+5. Basic trial once: second Basic trial CTA hidden / API 409  
+6. Pro trial once: same  
+7. After Pro trial expires unpaid → Free (or Basic if subscribed Basic) — Pro gates lock again  
+8. Cap intro-offer ineligible user never gets a fake local 7-day Pro  
 
 ## Related
 

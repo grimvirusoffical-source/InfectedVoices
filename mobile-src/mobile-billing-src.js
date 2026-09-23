@@ -38,13 +38,22 @@ function matchProduct(list, platform, id){
   }
   return list.find(p=>p.identifier===id)||null;
 }
+function explicitIntro(product){
+  const value=product?.isEligibleForIntroOffer??product?.eligibleForIntroOffer??product?.introEligibility;
+  if(value===false||value===1||value==='ineligible'||value==='INTRO_ELIGIBILITY_STATUS_INELIGIBLE')return false;
+  if(value===true||value===2||value==='eligible'||value==='INTRO_ELIGIBILITY_STATUS_ELIGIBLE')return true;
+  return null;
+}
 function describe(product, id, title){
-  return {productId:id, title:product?.title||title, price:product?.priceString||'', available:!!product};
+  const offer=freeTrialOffer(product);
+  const explicit=explicitIntro(product);
+  const introEligible=product?explicit===false?false:explicit===true?!!offer:!!offer:null;
+  return {productId:id, title:product?.title||title, price:product?.priceString||'', available:!!product, introEligible, offerToken:offer?.token||''};
 }
 function phaseIsFree(phase){
   if(!phase||typeof phase!=='object')return false;
   const mode=String(phase.paymentMode||phase.recurrenceMode||'');
-  if(mode==='freeTrial'||mode==='FREE_TRIAL')return true;
+  if(mode==='freeTrial'||mode==='FREE_TRIAL'||phase.paymentMode===0)return true;
   if(phase.price===0||phase.priceAmountMicros===0||phase.priceMicros===0)return true;
   const label=String(phase.priceString||phase.formattedPrice||'').toLowerCase();
   return label==='free'||label.startsWith('free ');
@@ -52,7 +61,7 @@ function phaseIsFree(phase){
 function freeTrialOffer(product){
   if(!product)return null;
   const intro=product.introductoryPrice||product.introPrice;
-  if(intro&&(intro.paymentMode==='freeTrial'||intro.price===0||phaseIsFree(intro)))return {token:''};
+  if(intro&&(intro.paymentMode==='freeTrial'||intro.price===0||phaseIsFree(intro)))return {token:product.offerToken?String(product.offerToken):''};
   const groups=[].concat(product.subscriptionOffers||[], product.offers||[], product.subscriptionOfferDetails||[]);
   for(const offer of groups){
     const phases=offer?.pricingPhases||offer?.pricingPhaseList||[];
@@ -97,12 +106,28 @@ export function createStoreBilling(nation){
     }
     return {platform, ids, list};
   }
+  async function honorEligibility(product, id, described){
+    if(!product||described.introEligible===false)return described;
+    const fn=NativePurchases.isEligibleForIntroOffer||NativePurchases.checkTrialOrIntroductoryPriceEligibility;
+    if(typeof fn!=='function')return described;
+    try{
+      const result=await fn.call(NativePurchases,{productIdentifier:id,productIdentifiers:[id]});
+      const row=result&&result[id]||result||{};
+      const status=row.status??row.eligibility??result?.status??result?.eligibility;
+      if(status===2||status===true||status==='eligible'||status==='INTRO_ELIGIBILITY_STATUS_ELIGIBLE')return described;
+      return {...described,introEligible:false};
+    }catch{
+      return described;
+    }
+  }
   async function summary(){
     const {platform, ids, list}=await loadProducts();
+    const basicProduct=matchProduct(list, platform, ids.basic);
+    const proProduct=matchProduct(list, platform, ids.pro);
     return {
       platform,
-      basic:describe(matchProduct(list, platform, ids.basic), ids.basic, 'Infected Voices Basic'),
-      pro:describe(matchProduct(list, platform, ids.pro), ids.pro, 'Infected Voices Pro')
+      basic:await honorEligibility(basicProduct, ids.basic, describe(basicProduct, ids.basic, 'Infected Voices Basic')),
+      pro:await honorEligibility(proProduct, ids.pro, describe(proProduct, ids.pro, 'Infected Voices Pro'))
     };
   }
   async function verify(tx,kind){
@@ -141,8 +166,9 @@ export function createStoreBilling(nation){
     const {list}=await loadProducts();
     const product=matchProduct(list, platform, id);
     if(!product)throw Error((plan==='basic'?'Basic':'Pro')+' is not on this device yet.');
+    const described=await honorEligibility(product, id, describe(product, id, plan==='basic'?'Basic':'Pro'));
     const offer=trial?freeTrialOffer(product):null;
-    if(trial&&!offer)throw Error('Store trial is not on this device yet.');
+    if(trial&&(described.introEligible===false||!offer))throw Error('Intro offer is not available for this account.');
     const tx=await NativePurchases.purchaseProduct({
       productIdentifier:id,
       productType:PURCHASE_TYPE.SUBS,
