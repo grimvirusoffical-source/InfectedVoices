@@ -24,11 +24,11 @@ async function jsonFetch(url,options={}){
   }finally{clearTimeout(timer);}
 }
 async function nationPost(path,data){
-  return jsonFetch(NATION_ORIGIN+path,{
+  return jsonFetch(path,{
     method:'POST',
     headers:{'Content-Type':'application/json','Accept':'application/json'},
     body:JSON.stringify(data||{}),
-    credentials:'omit',
+    credentials:'same-origin',
     redirect:'error'
   });
 }
@@ -36,14 +36,14 @@ function token(){return localStorage.getItem(TOKEN_KEY)||'';}
 function setToken(value){if(value)localStorage.setItem(TOKEN_KEY,value);else localStorage.removeItem(TOKEN_KEY);}
 async function connectNation(){
   const secret=randomHex(32);
-  const request=await nationPost('/api/v1/connect/start',{appId:APP_ID,secret});
+  const request=await nationPost('/api/auth/connect/start',{appId:APP_ID,secret});
   if(typeof request.id!=='string'||!Number.isFinite(request.expires))throw Error('InfectedNation returned an invalid connection request.');
   const url=NATION_ORIGIN+'/?connect='+encodeURIComponent(request.id)+'&app='+encodeURIComponent(APP_ID);
   const popup=window.open(url,'infectednation-login','popup,width=560,height=780');
   if(!popup){const error=Error('Allow popups for infectedvoices.space, then try again.');error.code='popup_blocked';throw error;}
   while(Date.now()<request.expires){
     await sleep(1400);
-    const result=await nationPost('/api/v1/connect/session',{id:request.id,secret});
+    const result=await nationPost('/api/auth/connect/session',{id:request.id,secret});
     if(result.pending)continue;
     if(!result.token||!result.account)throw Error('InfectedNation returned an incomplete session.');
     setToken(result.token);
@@ -87,7 +87,7 @@ export const auth={
   async signIn(){await connectNation();const s=await session();return {user:s.user};},
   async signOut(){
     const current=token();
-    try{if(current)await nationPost('/api/v1/session/logout',{token:current});}finally{setToken('');me={user:null};csrf='';}
+    try{if(current)await request('/api/logout',{});}finally{setToken('');me={user:null};csrf='';}
   }
 };
 export const isDesktop=false;
