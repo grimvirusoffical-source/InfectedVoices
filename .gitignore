@@ -1,5 +1,7 @@
 node_modules/
 dist/
+browser-dist/
+.browser-studio/
 app-source/
 .DS_Store
 *.xcuserdata

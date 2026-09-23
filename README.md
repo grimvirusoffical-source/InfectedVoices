@@ -1,3 +1,15 @@
+# Infected Voices — browser host, Windows, and mobile
+
+RedXAIHost serves this branch. `npm run build:browser` writes `browser-dist/`, and `npm run start:redx` listens on port **8791** (override with `PORT`). The home page is Studio 0.7.0, including the Vocal Lab v0.4.1 surface: bar/beat practice, Pocket Assist, Ultimate Mic Master, Grim Beats, the member’s own RoEx key field, and the v0.4.0 / v0.4.1 Windows channel notes. Arrangement Studio stays at `studio.html`. Account sign-in is the existing browser adapter. This repo does not ship Windows ZIPs or signing keys.
+
+```bash
+npm install
+npm run build:browser
+npm run start:redx
+```
+
+`npm run native:ios` and `npm run native:android` still build the Capacitor app. `npm run package:windows` stages an Electron shell from `browser-dist/` after the browser build.
+
 # Infected Voices — Core 5 Mobile
 
 Native mobile packaging for **Infected Voices Core 5**, using the same pinned local studio engine as the Windows/Core 5 build with a touch-first UI and store-managed native containers.

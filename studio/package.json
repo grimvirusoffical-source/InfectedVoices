@@ -1,0 +1,32 @@
+{
+  "name": "infected-voices-studio",
+  "private": true,
+  "version": "0.7.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:host": "tsc -b && vite build --outDir ../.browser-studio --emptyOutDir",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "postinstall": "node scripts/copy-worklets.mjs"
+  },
+  "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
+    "bungee-pitch-shift": "^1.0.8",
+    "idb": "^8.0.3",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tone": "^15.1.22"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.81.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}

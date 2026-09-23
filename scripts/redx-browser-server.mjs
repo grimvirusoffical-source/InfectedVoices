@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const PORT=Number(process.env.PORT||8790);
+const PORT=Number(process.env.PORT||8791);
 const HOST=process.env.HOST||"0.0.0.0";
 const NATION=(process.env.NATION_ORIGIN||"https://nation.infectedvoices.space").replace(/\/+$/,"");
 const APP_ID="infected-voices";
@@ -26,7 +26,8 @@ const TYPES={
   ".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".mjs":"text/javascript; charset=utf-8",
   ".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".svg":"image/svg+xml",
   ".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp",".ico":"image/x-icon",
-  ".woff":"font/woff",".woff2":"font/woff2",".wasm":"application/wasm",".mp3":"audio/mpeg",".wav":"audio/wav"
+  ".woff":"font/woff",".woff2":"font/woff2",".wasm":"application/wasm",".mp3":"audio/mpeg",".wav":"audio/wav",
+  ".webmanifest":"application/manifest+json"
 };
 function cors(req){
   const origin=req.headers.get("origin")||"";
