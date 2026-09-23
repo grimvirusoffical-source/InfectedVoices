@@ -74,21 +74,32 @@ export async function mountMobileChrome(){
   let user=null;try{user=await shell.user();}catch{}
   if(!user){body.append(E('p','Sign in to InfectedNation before purchasing or restoring Studio Plus.'));return;}
   body.append(E('p','iPhone/iPad purchases use Apple In-App Purchase. Android purchases use Google Play Billing. Stripe is not used inside the mobile apps.'));
-  let ready=true;
-  try{
-    const info=await shell.storeSummary();
-    const price=info.price?(' · '+info.price):'';
-    body.append(E('h3',(info.title||'Infected Voices Studio Plus')+price));
-  }catch(e){
-    ready=false;
-    body.append(E('p','The store product is not available yet: '+e.message));
-    body.append(button('Pro on web/desktop',async()=>{const origin=String(config.serverOrigin||'https://infectedvoices.space').replace(/\/$/,'');await shell.openExternal(origin+'/#account');}));
+  let catalog=null;
+  try{catalog=await shell.storeSummary();}catch(e){catalog=null;status.textContent=e.message||'Store billing is not available on this device.';}
+  const offers=catalog?[
+    ['basic','Basic','$20',catalog.basic],
+    ['pro','Pro','$40',catalog.pro]
+  ]:[['basic','Basic','$20',null],['pro','Pro','$40',null]];
+  let any=false;
+  for(const [id,name,price,info] of offers){
+    if(info?.available){
+      any=true;
+      body.append(E('h3',(info.title||name)+(info.price?(' · '+info.price):(' · '+price))));
+      body.append(button('Get '+name+' — '+price,async()=>{
+        busy=true;status.textContent='Opening the store…';
+        try{
+          await shell.purchaseSubscription(id);
+          status.textContent='Purchase verified. Refreshing access…';
+          setTimeout(()=>location.reload(),500);
+        }catch(e){status.textContent=e.message||'The purchase could not be completed.';}
+        finally{busy=false;}
+      },true));
+    }else body.append(E('p',name+' is not on this device yet.'));
   }
-  if(!ready)return;
+  if(!any)body.append(E('p','Free has no in-app product. Basic and Pro appear here when the store catalog returns them.'));
   body.append(
-    button('Subscribe',async()=>{busy=true;status.textContent='Opening the store…';try{await shell.purchaseSubscription();status.textContent='Purchase verified. Refreshing access…';setTimeout(()=>location.reload(),500);}finally{busy=false;}},true),
-    button('Restore purchases',async()=>{busy=true;status.textContent='Checking your store account…';try{await shell.restorePurchases();status.textContent='Purchase restored and verified.';setTimeout(()=>location.reload(),500);}finally{busy=false;}}),
-    button('Manage subscription',async()=>{await shell.manageSubscription();status.textContent='Opened your platform subscription settings.';})
+    button('Restore purchases',async()=>{busy=true;status.textContent='Checking your store account…';try{await shell.restorePurchases();status.textContent='Purchase restored and verified.';setTimeout(()=>location.reload(),500);}catch(e){status.textContent=e.message||'No store purchase could be restored.';}finally{busy=false;}}),
+    button('Manage subscription',async()=>{try{await shell.manageSubscription();status.textContent='Opened your platform subscription settings.';}catch(e){status.textContent=e.message||'Store billing is not available on this device.';}})
   );
  }
  async function showUpdates(){
@@ -146,9 +157,10 @@ export async function mountMobileChrome(){
    ['Automation',gate('core5',()=>document.getElementById('core5Producer')?.click())],
    ['Sidechain',gate('core5',()=>document.getElementById('core5Producer')?.click())],
    ['Precision Tune',gate('precision',()=>clickStage(4))],
+   ['Precision Pocket',gate('precision_pocket',()=>clickStage(3))],
    ['Project Lab',gate('project-lab',()=>{location.href='index.html#lab';})],
    ['Pocket',go(()=>clickStage(3))],
-   ['Mastering',gate('core5',()=>clickStage(6))],
+   ['Mastering',gate('core5_master',()=>clickStage(6))],
    ['Export',go(()=>clickStage(7))],
    ['Plugins',go(()=>document.getElementById('pluginsTab')?.click())],
    ['Release & connect',go(()=>document.getElementById('integrationsTab')?.click())],

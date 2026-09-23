@@ -1,10 +1,10 @@
-import {PRO_FEATURES, BASIC_FEATURES, canUse, claimTrial, featureById, lockBody, readStudioPlus, resolveTier, trialUsed} from './entitlements.js';
+import {PRO_FEATURES, BASIC_FEATURES, BASIC_PLUS, canUse, entitlementKey, featureById, lockBody, resolveTier, setDemoPlan} from './entitlements.js';
 
 const COACH = [
   {id:'record', view:'record', title:'Record', body:'Hit REC and spit a take. Headphones help.', cta:'Record a take', run:'recordTake'},
   {id:'loop', view:'record', title:'Loop', body:'Loop a bar range, then record. Loop+Rec stays on while both are running.', cta:'Arm the loop', run:'armLoop'},
   {id:'tune', view:'tune', title:'Tune', body:'Snap pitch to the key. Start with Auto-Tune — go deeper anytime.', cta:'Auto-tune take', run:'autoTune'},
-  {id:'pocket', view:'tune', title:'Pocket', body:'Assist stays inside ±80 ms. Precision Pocket is on Basic.', cta:'Open Pocket', feature:'precision'},
+  {id:'pocket', view:'tune', title:'Pocket', body:'Assist stays inside ±80 ms. Precision Pocket is on Basic.', cta:'Open Pocket', run:'openPocket'},
   {id:'mix', view:'mix', title:'Mix', body:'One tap balances levels and loudness. Open Mixer to tweak.', cta:'One-click mix', run:'smartMix'},
   {id:'lab', view:'mix', title:'Project Lab', body:'Stem gain, offset, and the take vault are on Basic.', cta:'Open Project Lab', feature:'project-lab'},
   {id:'producer', view:'mix', title:'Producer', body:'GRIM, Precision, and Core 5 Producer are on Basic.', cta:'Open Producer', feature:'core5'},
@@ -30,6 +30,9 @@ const GUARDS = {
   'Export aligned dry stems':'stems',
   'Export master · 24-bit WAV':'24-bit',
   'Export unmastered · 24-bit WAV':'24-bit',
+  'Save portable project':'portable_project',
+  'Open Precision Tune editor':'precision_tune',
+  'Open Precision Pocket editor':'precision_pocket',
   'Open stem separation':'isolate',
   'Open parameter assistant':'ai-mix'
 };
@@ -119,31 +122,21 @@ export async function mountCreate({shell, config}) {
     try { return JSON.parse(localStorage.getItem(storageKey(name))) ?? fallback; }
     catch { return fallback; }
   }
-  function trials() { return readJSON('trials', {}); }
   function signal() {
     const user = window.ivStudioBridge?.currentUser?.() || {};
-    const stored = trials();
-    const plus = readStudioPlus();
+    const studio = String(user.studioPlan || '').toLowerCase();
     return {
-      plan: user.plan || plus?.plan,
+      studioPlan: studio === 'free' || studio === 'basic' || studio === 'pro' ? studio : undefined,
       kind: user.kind,
-      basic: user.basic === true || user.plan === 'basic' || user.tier === 'basic',
-      pro: user.pro === true || plus?.plan === 'pro',
-      verified: plus?.verified === true,
-      productId: plus?.productId || user.productId,
-      capabilities: user.capabilities,
-      basicTrialUsedAt: stored.basicTrialUsedAt || user.basicTrialUsedAt,
-      proTrialUsedAt: stored.proTrialUsedAt || user.proTrialUsedAt
+      nationPlan: user.nationPlan
     };
   }
   function tier() { return resolveTier(signal()); }
-  function startTrial(kind) {
-    const result = claimTrial(kind, trials());
-    if (!result.ok) return;
-    localStorage.setItem(storageKey('trials'), JSON.stringify(result.record));
+  function activate(plan) {
+    setDemoPlan(plan);
     render();
   }
-  function allowed(featureId) { return canUse(featureId, {...signal(), tier: tier()}); }
+  function allowed(featureId) { return canUse(featureId, signal()); }
   function loadAccount() {
     const user = window.ivStudioBridge?.currentUser?.() || {};
     accountKey = String(user.userId || user.id || user.email || 'device');
@@ -395,7 +388,8 @@ export async function mountCreate({shell, config}) {
     if (!rec) throw Error('Record is not available on this screen.');
     rec.click();
   }
-  const runners = {autoTune, lockBeat, smartMix, exportWav, exportStems, recordTake, armLoop};
+  function openPocket() { openAdvanced('beat'); }
+  const runners = {autoTune, lockBeat, smartMix, exportWav, exportStems, recordTake, armLoop, openPocket};
 
   function toastMessage(text, advanced, keep) {
     toast.hidden = false;
@@ -432,7 +426,7 @@ export async function mountCreate({shell, config}) {
     head.className = 'dialog-top iv-sheet-top';
     const titles = E('div');
     titles.className = 'iv-sheet-titles';
-    const basicGate = BASIC_FEATURES.some(feature => feature.id === featureId);
+    const basicGate = BASIC_PLUS.includes(entitlementKey(featureId));
     const kicker = E('p', basicGate ? 'Basic' : 'Pro');
     kicker.className = 'iv-kicker';
     titles.append(kicker, E('h2', basicGate ? 'Unlock with Basic' : 'Unlock with Pro'));
@@ -456,17 +450,17 @@ export async function mountCreate({shell, config}) {
     buy.className = 'primary';
     buy.onclick = () => {
       lock.close();
-      if (!basicGate && !showStripe) openStore();
+      if (capStore) openStore(basicGate ? 'basic' : 'pro');
       else { showView('subscribe'); setMode('create'); }
     };
     actions.append(buy);
-    const trialKind = basicGate ? 'basic' : 'pro';
-    const trialKey = trialKind === 'pro' ? 'proTrialUsedAt' : 'basicTrialUsedAt';
-    if (!trialUsed(signal()[trialKey]) && tier() === 'free') {
-      const trial = E('button', trialKind === 'pro' ? 'Start 7-day Pro trial' : 'Start 7-day Basic trial');
-      trial.type = 'button';
-      trial.onclick = () => { lock.close(); startTrial(trialKind); };
-      actions.append(trial);
+    const paid = basicGate ? 'basic' : 'pro';
+    if (tier() !== 'pro' && tier() !== paid) {
+      const demo = E('button', basicGate ? 'Activate Basic' : 'Activate Pro');
+      demo.type = 'button';
+      demo.className = 'ghost';
+      demo.onclick = () => { lock.close(); activate(paid); };
+      actions.append(demo);
     }
     const later = E('button', 'Maybe later');
     later.type = 'button';
@@ -477,13 +471,8 @@ export async function mountCreate({shell, config}) {
     lock.append(head, body);
     if (!lock.open) lock.showModal();
   }
-  async function openWeb() {
-    const origin = String(config.serverOrigin || 'https://infectedvoices.space').replace(/\/$/, '');
-    await shell.openExternal(origin + '/#account');
-  }
-  function openStore() {
-    if (typeof window.ivOpenNativeStore === 'function') window.ivOpenNativeStore();
-    else openWeb();
+  function openStore(tier) {
+    if (typeof window.ivOpenNativeStore === 'function') window.ivOpenNativeStore(tier);
   }
   function openProjectLab() {
     if (!allowed('project-lab')) return openLock('project-lab');
@@ -501,12 +490,13 @@ export async function mountCreate({shell, config}) {
       ['Producer', gate('core5', () => openAdvanced('producer'))],
       ['GRIM rack', gate('grim', () => openAdvanced('producer'))],
       ['Precision Tune', gate('precision', () => openAdvanced('tune'))],
+      ['Precision Pocket', gate('precision_pocket', () => openAdvanced('beat'))],
       ['Project Lab', gate('project-lab', () => { location.href = (arrangement() ? 'index.html' : '../index.html') + '#lab'; })],
       ['Pocket', () => { moreDialog.close(); openAdvanced('beat'); }],
       ['Plugins', () => { moreDialog.close(); setMode('studio'); document.getElementById('pluginsTab')?.click(); }],
       ['Release & connect', () => { moreDialog.close(); setMode('studio'); document.getElementById('integrationsTab')?.click(); }],
       ['AI tools', () => { moreDialog.close(); setMode('studio'); document.getElementById('aiTab')?.click(); }],
-      ['Mastering', gate('core5', () => openAdvanced('master'))],
+      ['Mastering', gate('core5_master', () => openAdvanced('master'))],
       ['Export', () => { moreDialog.close(); showView('export'); setMode('create'); }],
       ['Tutorial', () => { moreDialog.close(); setMode('studio'); document.getElementById('tutorial')?.click(); }],
       ['Saved projects', () => { moreDialog.close(); setMode('studio'); document.getElementById('openSaved')?.click(); }],
@@ -707,19 +697,22 @@ export async function mountCreate({shell, config}) {
     screen.append(kicker, E('h2', 'Free, Basic, and Pro'));
     const plans = E('div');
     plans.className = 'iv-plans';
-    plans.append(planCard('free', 'Free', '$0', ['Record and arrange', 'Export master 16-bit WAV', 'Classic MP3']));
-    plans.append(planCard('basic', 'Basic', '$20', ['GRIM, Precision Tune, Core 5 Producer', 'Smart Mix + Master and Project Lab', '48 kHz / 24-bit WAV']));
+    plans.append(planCard('free', 'Free', '$0', ['Record and arrange', 'Local InfectedTune and Pocket', 'Core 3 mix', 'MP3 and 16-bit WAV']));
+    plans.append(planCard('basic', 'Basic', '$20', BASIC_FEATURES.map(feature => feature.name)));
     plans.append(planCard('pro', 'Pro', '$40', PRO_FEATURES.map(feature => feature.name)));
     screen.append(plans);
+    const upsell = E('p', 'Free upgrades to Basic for the full local pro studio. Basic upgrades to Pro for AI, stems, and isolation.');
+    upsell.className = 'iv-note';
+    screen.append(upsell);
     if (!showStripe) {
-      const meta = E('p', 'iPhone and Android Pro uses Apple In-App Purchase or Google Play Billing. Stripe is not used inside the mobile apps.');
+      const meta = E('p', 'iPhone and Android Basic and Pro use Apple In-App Purchase or Google Play Billing. Stripe is not used inside the mobile apps. Free has no in-app product.');
       meta.className = 'iv-sheet-meta';
       screen.append(meta);
     }
     const manage = E('button', 'Manage');
     manage.type = 'button';
     manage.className = 'ghost iv-wide';
-    manage.onclick = () => showStripe ? openWeb() : openStore();
+    manage.onclick = () => openStore();
     screen.append(manage);
     return screen;
   }
@@ -737,28 +730,26 @@ export async function mountCreate({shell, config}) {
       button.disabled = true;
       article.append(button);
     } else if (id === 'pro') {
-      const button = E('button', 'Get Pro — $40');
-      button.type = 'button';
-      button.className = 'primary';
-      button.onclick = () => showStripe ? openWeb() : openStore();
-      article.append(button);
-      article.append(trialButton('pro'));
-    } else if (id === 'basic') {
-      const button = E('button', showStripe ? 'Get Basic — $20' : 'On web/desktop');
-      button.type = 'button';
-      button.onclick = () => openWeb();
-      article.append(button);
-      article.append(trialButton('basic'));
+      article.append(purchaseButton('Get Pro — $40', 'pro'));
+      article.append(activateButton('Activate Pro', 'pro'));
+    } else if (id === 'basic' && tier() !== 'pro') {
+      article.append(purchaseButton('Get Basic — $20', 'basic'));
+      article.append(activateButton('Activate Basic', 'basic'));
     }
     return article;
   }
-  function trialButton(kind) {
-    const key = kind === 'pro' ? 'proTrialUsedAt' : 'basicTrialUsedAt';
-    const button = E('button', trialUsed(signal()[key]) ? 'Trial already used' : (kind === 'pro' ? 'Start 7-day Pro trial' : 'Start 7-day Basic trial'));
+  function purchaseButton(label, plan) {
+    const button = E('button', label);
+    button.type = 'button';
+    button.className = plan === 'pro' ? 'primary' : '';
+    button.onclick = () => capStore ? openStore(plan) : showView('subscribe');
+    return button;
+  }
+  function activateButton(label, plan) {
+    const button = E('button', label);
     button.type = 'button';
     button.className = 'ghost iv-wide';
-    button.disabled = trialUsed(signal()[key]) || (kind === 'basic' ? tier() !== 'free' : tier() === 'pro');
-    button.onclick = () => startTrial(kind);
+    button.onclick = () => activate(plan);
     return button;
   }
 
@@ -809,8 +800,8 @@ export async function mountCreate({shell, config}) {
       if (step.feature) {
         if (!allowed(step.feature)) { openLock(step.feature); return; }
         if (step.feature === 'project-lab') { openProjectLab(); return; }
-        if (step.feature === 'core5') { openAdvanced('producer'); return; }
-        openAdvanced(step.feature === 'precision' ? 'tune' : 'beat');
+        if (step.feature === 'core5' || step.feature === 'core5_automation') { openAdvanced('producer'); return; }
+        openAdvanced('beat');
         return;
       }
       if (step.run) runAction(step.run);
@@ -883,7 +874,7 @@ export async function mountCreate({shell, config}) {
     if (button.id === 'core5Producer') return 'core5';
     if (button.id === 'exportStem') return 'stems';
     const text = button.textContent.trim();
-    if (button.closest('#steps') && /Master$/.test(text)) return 'core5';
+    if (button.closest('#steps') && /Master$/.test(text)) return 'core5_master';
     if (text === 'GRIM rack' || text.startsWith('GRIM')) return 'grim';
     return GUARDS[text] || '';
   }

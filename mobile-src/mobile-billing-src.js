@@ -1,8 +1,13 @@
 import { Capacitor } from '@capacitor/core';
 import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
-import { rememberStudioPlus } from './entitlements.js';
+import {
+  ANDROID_BASIC_PRODUCT_ID,
+  ANDROID_PRO_PRODUCT_ID,
+  IOS_BASIC_PRODUCT_ID,
+  IOS_PRO_PRODUCT_ID,
+  applyServerAccess
+} from './entitlements.js';
 
-export const STORE_PRODUCT_ID='infectedvoices.studio.monthly';
 export const ANDROID_BASE_PLAN_ID='monthly';
 const APP_ID='infected-voices';
 
@@ -14,8 +19,28 @@ async function stableUuid(value){
   const hex=[...id].map(v=>v.toString(16).padStart(2,'0')).join('');
   return hex.slice(0,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16)+'-'+hex.slice(16,20)+'-'+hex.slice(20);
 }
-function productId(tx){return String(tx?.productIdentifier||tx?.productId||'');}
+function productId(tx){return String(tx?.productIdentifier||tx?.productId||tx?.planIdentifier||'');}
 function currentPlatform(){return Capacitor.getPlatform();}
+function idsFor(platform){
+  return platform==='android'
+    ? {basic:ANDROID_BASIC_PRODUCT_ID, pro:ANDROID_PRO_PRODUCT_ID}
+    : {basic:IOS_BASIC_PRODUCT_ID, pro:IOS_PRO_PRODUCT_ID};
+}
+function knownProduct(id){
+  return id===IOS_BASIC_PRODUCT_ID||id===IOS_PRO_PRODUCT_ID||id===ANDROID_BASIC_PRODUCT_ID||id===ANDROID_PRO_PRODUCT_ID;
+}
+function matchProduct(list, platform, id){
+  if(platform==='android'){
+    return list.find(p=>p.planIdentifier===id&&p.identifier===ANDROID_BASE_PLAN_ID)
+      ||list.find(p=>p.planIdentifier===id)
+      ||list.find(p=>p.identifier===id)
+      ||null;
+  }
+  return list.find(p=>p.identifier===id)||null;
+}
+function describe(product, id, title){
+  return {productId:id, title:product?.title||title, price:product?.priceString||'', available:!!product};
+}
 
 export function createStoreBilling(nation){
   async function support(){
@@ -31,26 +56,31 @@ export function createStoreBilling(nation){
     const user=await account();
     return stableUuid(user.accountId);
   }
-  async function products(){
-    if(!(await support()))throw Error('Store billing is not available on this device.');
-    const {products}=await NativePurchases.getProducts({
-      productIdentifiers:[STORE_PRODUCT_ID],
-      productType:PURCHASE_TYPE.SUBS
-    });
-    return products||[];
+  async function loadProducts(){
+    const platform=currentPlatform();
+    const ids=idsFor(platform);
+    const wanted=[ids.basic, ids.pro];
+    if(!(await support()))return {platform, ids, list:[]};
+    let list=[];
+    try{
+      const result=await NativePurchases.getProducts({productIdentifiers:wanted, productType:PURCHASE_TYPE.SUBS});
+      list=result.products||[];
+    }catch{
+      for(const id of wanted){
+        try{
+          const result=await NativePurchases.getProducts({productIdentifiers:[id], productType:PURCHASE_TYPE.SUBS});
+          list.push(...(result.products||[]));
+        }catch{/* This product is not in the device catalog. */}
+      }
+    }
+    return {platform, ids, list};
   }
   async function summary(){
-    const list=await products();
-    const platform=currentPlatform();
-    let product=null;
-    if(platform==='android'){
-      product=list.find(p=>p.planIdentifier===STORE_PRODUCT_ID&&p.identifier===ANDROID_BASE_PLAN_ID)
-        ||list.find(p=>p.planIdentifier===STORE_PRODUCT_ID)||list[0]||null;
-    }else product=list.find(p=>p.identifier===STORE_PRODUCT_ID)||list[0]||null;
+    const {platform, ids, list}=await loadProducts();
     return {
-      platform,productId:STORE_PRODUCT_ID,basePlanId:ANDROID_BASE_PLAN_ID,
-      title:product?.title||'Infected Voices Studio Plus',
-      price:product?.priceString||'',product
+      platform,
+      basic:describe(matchProduct(list, platform, ids.basic), ids.basic, 'Infected Voices Basic'),
+      pro:describe(matchProduct(list, platform, ids.pro), ids.pro, 'Infected Voices Pro')
     };
   }
   async function verify(tx,kind){
@@ -59,7 +89,7 @@ export function createStoreBilling(nation){
     const platform=currentPlatform();
     const payload={
       token,appId:APP_ID,platform,kind,
-      productId:productId(tx)||STORE_PRODUCT_ID,
+      productId:productId(tx),
       transactionId:String(tx?.transactionId||''),
       purchaseToken:String(tx?.purchaseToken||''),
       orderId:String(tx?.orderId||''),
@@ -72,25 +102,28 @@ export function createStoreBilling(nation){
     };
     const result=await nation.post('/api/v1/billing/mobile/verify',payload);
     if(!(result?.allowed||result?.verified))throw Error(result?.error||'The store purchase could not be verified.');
-    rememberStudioPlus({...result, productId:payload.productId, allowed:result.allowed===true, verified:result.verified===true});
+    applyServerAccess({...result, productId:payload.productId, allowed:result.allowed===true, verified:result.verified===true});
     const finishToken=platform==='android'?tx?.purchaseToken:tx?.transactionId;
     if(finishToken){
       try{await NativePurchases.acknowledgePurchase({purchaseToken:String(finishToken)});}catch{}
     }
     return result;
   }
-  async function purchase(){
+  async function purchase(tier){
+    const plan=tier==='basic'?'basic':'pro';
     const user=await account();
     if(!(await support()))throw Error('Store billing is not available on this device.');
-    const platform=currentPlatform(),uuid=await stableUuid(user.accountId);
-    const options={
-      productIdentifier:STORE_PRODUCT_ID,
+    const platform=currentPlatform();
+    const id=idsFor(platform)[plan];
+    const {list}=await loadProducts();
+    if(!matchProduct(list, platform, id))throw Error((plan==='basic'?'Basic':'Pro')+' is not on this device yet.');
+    const tx=await NativePurchases.purchaseProduct({
+      productIdentifier:id,
       productType:PURCHASE_TYPE.SUBS,
-      appAccountToken:uuid,
-      autoAcknowledgePurchases:false
-    };
-    if(platform==='android')options.planIdentifier=ANDROID_BASE_PLAN_ID;
-    const tx=await NativePurchases.purchaseProduct(options);
+      appAccountToken:await stableUuid(user.accountId),
+      autoAcknowledgePurchases:false,
+      ...(platform==='android'?{planIdentifier:ANDROID_BASE_PLAN_ID}:{})
+    });
     return verify(tx,'purchase');
   }
   async function restore(){
@@ -103,8 +136,8 @@ export function createStoreBilling(nation){
       appAccountToken:uuid,
       onlyCurrentEntitlements:true
     });
-    const matches=(purchases||[]).filter(tx=>productId(tx)===STORE_PRODUCT_ID);
-    if(!matches.length)throw Error('No active Studio Plus store purchase was found for this account.');
+    const matches=(purchases||[]).filter(tx=>knownProduct(productId(tx)));
+    if(!matches.length)throw Error('No active Basic or Pro store purchase was found for this account.');
     let lastError=null;
     for(const tx of matches){
       try{
@@ -112,7 +145,7 @@ export function createStoreBilling(nation){
         if(result?.allowed||result?.verified)return result;
       }catch(error){lastError=error;}
     }
-    throw lastError||Error('No active Studio Plus entitlement could be restored.');
+    throw lastError||Error('No active Basic or Pro entitlement could be restored.');
   }
   async function manage(){
     if(!(await support()))throw Error('Store billing is not available on this device.');

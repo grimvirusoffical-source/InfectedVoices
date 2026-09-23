@@ -1,165 +1,171 @@
-/** Basic ($20) includes the studio tools below. These five actions are Pro ($40) only. */
+/** Studio plans. InfectedNation free|infectious|plague is not a studio plan. */
+export const BASIC_PLUS = [
+  'precision_tune', 'precision_pocket', 'grim_rack',
+  'core5_automation', 'core5_master', 'wav24',
+  'smart_mix_local', 'project_lab', 'portable_project'
+];
+
+export const PRO_ONLY = [
+  'stems', 'ai_mix_master', 'ai_autotune', 'ai_pocket', 'vocal_isolation'
+];
+
+export const BASIC_FEATURES = [
+  {id:'precision_tune', name:'Precision Tune'},
+  {id:'precision_pocket', name:'Precision Pocket'},
+  {id:'grim_rack', name:'GRIM'},
+  {id:'core5_automation', name:'Core 5 automation'},
+  {id:'core5_master', name:'Core 5 master'},
+  {id:'wav24', name:'24-bit WAV'},
+  {id:'smart_mix_local', name:'Smart Mix + Master'},
+  {id:'project_lab', name:'Project Lab'},
+  {id:'portable_project', name:'Portable project'}
+];
+
 export const PRO_FEATURES = [
   {id:'stems', name:'Export stems'},
-  {id:'ai-mix', name:'AI Mix / Master'},
-  {id:'ai-tune', name:'AI Auto-Tune'},
-  {id:'ai-beat', name:'AI Beat-Lock'},
-  {id:'isolate', name:'Vocal isolation'}
+  {id:'ai_mix_master', name:'AI Mix / Master'},
+  {id:'ai_autotune', name:'AI Auto-Tune'},
+  {id:'ai_pocket', name:'AI Beat-Lock'},
+  {id:'vocal_isolation', name:'Vocal isolation'}
 ];
 
-/** Free does not include these. Basic, Pro, and an active trial do. */
-export const BASIC_FEATURES = [
-  {id:'grim', name:'GRIM'},
-  {id:'precision', name:'Precision Tune'},
-  {id:'core5', name:'Core 5 Producer'},
-  {id:'24-bit', name:'24-bit export'},
-  {id:'smart-mix', name:'Smart Mix + Master'},
-  {id:'project-lab', name:'Project Lab'}
-];
+export const IOS_BASIC_PRODUCT_ID = 'space.infectedvoices.studio.basic.monthly';
+export const IOS_PRO_PRODUCT_ID = 'space.infectedvoices.studio.pro.monthly';
+export const ANDROID_BASIC_PRODUCT_ID = 'iv_studio_basic';
+export const ANDROID_PRO_PRODUCT_ID = 'iv_studio_pro';
+export const STORE_PRODUCT_ID = IOS_PRO_PRODUCT_ID;
 
-export const STORE_PRODUCT_ID = 'infectedvoices.studio.monthly';
-export const TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
+const ALIAS = {
+  precision:'precision_tune',
+  precision_tune:'precision_tune',
+  precision_pocket:'precision_pocket',
+  grim:'grim_rack',
+  grim_rack:'grim_rack',
+  core5:'core5_automation',
+  core5_automation:'core5_automation',
+  core5_master:'core5_master',
+  '24-bit':'wav24',
+  wav24:'wav24',
+  'smart-mix':'smart_mix_local',
+  smart_mix_local:'smart_mix_local',
+  'project-lab':'project_lab',
+  project_lab:'project_lab',
+  portable_project:'portable_project',
+  stems:'stems',
+  'ai-mix':'ai_mix_master',
+  ai_mix_master:'ai_mix_master',
+  'ai-tune':'ai_autotune',
+  ai_autotune:'ai_autotune',
+  'ai-beat':'ai_pocket',
+  ai_pocket:'ai_pocket',
+  isolate:'vocal_isolation',
+  vocal_isolation:'vocal_isolation'
+};
 
-const PRO_IDS = new Set(PRO_FEATURES.map(feature => feature.id));
-const BASIC_IDS = new Set(BASIC_FEATURES.map(feature => feature.id));
+const NATION_SOCIAL = new Set(['infectious', 'plague']);
+let sessionPlan = '';
 
-export function trialStamp(value) {
-  if (value == null || value === '' || value === false) return 0;
-  const stamp = typeof value === 'number' ? value : Date.parse(String(value));
-  return Number.isFinite(stamp) && stamp > 0 ? stamp : 0;
+export function entitlementKey(id) {
+  return ALIAS[id] || id;
 }
 
-export function trialActive(usedAt, now = Date.now()) {
-  const start = trialStamp(usedAt);
-  return start > 0 && now >= start && now - start < TRIAL_MS;
+/** pro unlocks everything. basic unlocks local pro tools. free keeps the local starter set. */
+export function can(plan, entitlement) {
+  const key = entitlementKey(entitlement);
+  if (plan === 'pro') return true;
+  if (plan === 'basic') return !PRO_ONLY.includes(key);
+  return !BASIC_PLUS.includes(key) && !PRO_ONLY.includes(key);
 }
 
-export function trialUsed(usedAt) {
-  return trialStamp(usedAt) > 0;
+export function planFromAccess(access = {}) {
+  const social = String(access.nationPlan || access.socialPlan || access.kind || '').toLowerCase();
+  const studio = String(access.studioPlan || '').toLowerCase();
+  if (studio === 'free' || studio === 'basic' || studio === 'pro') return studio;
+  const named = String(access.plan || '').toLowerCase();
+  if (NATION_SOCIAL.has(named) || NATION_SOCIAL.has(social)) return 'free';
+  if (named === 'basic' || named === 'pro' || named === 'free') return named;
+  return 'free';
 }
 
-function paidPro(signal) {
-  const blob = [signal.plan, signal.kind, signal.badge].filter(Boolean).join(' ').toLowerCase();
-  return signal.pro === true
-    || signal.verified === true
-    || signal.productId === STORE_PRODUCT_ID
-    || signal.capabilities?.stemSeparation === true
-    || /\bpro\b|\bhighest\b/.test(blob);
+export function readDemoPlan() {
+  try {
+    const value = localStorage.getItem('iv-studio-demo-plan');
+    if (value === 'basic' || value === 'pro' || value === 'free') return value;
+  } catch { /* storage unavailable */ }
+  return '';
 }
 
-function paidBasic(signal) {
-  const blob = [signal.plan, signal.kind, signal.badge].filter(Boolean).join(' ').toLowerCase();
-  return signal.basic === true || /\bbasic\b/.test(blob);
+/** QA flip until store products are live. Server basic|pro still wins. */
+export function setDemoPlan(plan) {
+  if (plan === 'free') localStorage.removeItem('iv-studio-demo-plan');
+  else if (plan === 'basic' || plan === 'pro') localStorage.setItem('iv-studio-demo-plan', plan);
+  return plan;
 }
 
-/** Signed-in, allowed, lifetime, or member is not a plan. */
-export function resolveTier(signal = {}, now = Date.now()) {
-  if (paidPro(signal) || trialActive(signal.proTrialUsedAt, now)) return 'pro';
-  if (paidBasic(signal) || trialActive(signal.basicTrialUsedAt, now)) return 'basic';
-  const explicit = String(signal.tier || '').toLowerCase();
-  if (explicit === 'pro' || explicit === 'basic' || explicit === 'free') return explicit;
+export function applyServerAccess(result) {
+  const plan = planFromVerify(result);
+  if (plan === 'basic' || plan === 'pro') sessionPlan = plan;
+  return plan;
+}
+
+export function planFromVerify(result) {
+  if (!result || result.allowed !== true && result.verified !== true) return 'free';
+  const named = planFromAccess(result);
+  if (named === 'basic' || named === 'pro') return named;
+  const product = String(result.productId || result.product || '');
+  if (product === IOS_PRO_PRODUCT_ID || product === ANDROID_PRO_PRODUCT_ID) return 'pro';
+  if (product === IOS_BASIC_PRODUCT_ID || product === ANDROID_BASIC_PRODUCT_ID) return 'basic';
+  return 'free';
+}
+
+/** Signed-in, allowed, lifetime, Nation social, or a client boolean is Free. */
+export function resolveTier(signal = {}) {
+  const server = planFromAccess(signal);
+  if (server === 'basic' || server === 'pro') return server;
+  if (sessionPlan === 'basic' || sessionPlan === 'pro') return sessionPlan;
+  if (signal.demoPlan === 'basic' || signal.demoPlan === 'pro') return signal.demoPlan;
+  const demo = readDemoPlan();
+  if (demo === 'basic' || demo === 'pro') return demo;
   return 'free';
 }
 
 export function canUse(featureId, signal = {}) {
-  const tier = signal.tier || resolveTier(signal);
-  if (tier === 'pro') return true;
-  const caps = signal.capabilities || {};
-  if (featureId === 'isolate' && caps.stemSeparation) return true;
-  if ((featureId === 'ai-mix' || featureId === 'ai-tune' || featureId === 'ai-beat') && caps.aiAssist) return true;
-  if (PRO_IDS.has(featureId)) return false;
-  if (BASIC_IDS.has(featureId)) return tier === 'basic';
-  return tier === 'free' || tier === 'basic';
+  return can(signal.tier || resolveTier(signal), entitlementKey(featureId));
 }
 
 export function lockBody(name, featureId) {
-  if (featureId && BASIC_IDS.has(featureId)) return name + ' is on the $20 Basic plan.';
+  if (featureId && BASIC_PLUS.includes(entitlementKey(featureId))) return name + ' is on the $20 Basic plan.';
   return name + ' is on the $40 Pro plan.';
 }
 
 export function featureById(id) {
-  return PRO_FEATURES.find(feature => feature.id === id) || BASIC_FEATURES.find(feature => feature.id === id) || null;
+  const key = entitlementKey(id);
+  return PRO_FEATURES.find(feature => feature.id === key) || BASIC_FEATURES.find(feature => feature.id === key) || null;
 }
 
-export function claimTrial(kind, record = {}, now = Date.now()) {
-  const key = kind === 'pro' ? 'proTrialUsedAt' : 'basicTrialUsedAt';
-  if (trialUsed(record[key])) return {ok:false, reason:'used', record};
-  const next = {...record, [key]: now};
-  return {ok:true, record:next, tier:resolveTier(next, now)};
+export function clientSignal() {
+  return {demoPlan:readDemoPlan(), studioPlan:sessionPlan || undefined};
 }
 
-/** A verified Studio Plus store receipt is Pro. A failed or empty verify is not. */
-export function tierFromStoreVerify(result) {
-  if (!result || result.allowed !== true && result.verified !== true) return 'free';
-  const product = String(result.productId || result.product || STORE_PRODUCT_ID);
-  if (product && product !== STORE_PRODUCT_ID) return 'free';
-  return 'pro';
-}
-
-export function rememberStudioPlus(result) {
-  if (tierFromStoreVerify(result) !== 'pro') return null;
-  const record = {plan:'pro', productId:STORE_PRODUCT_ID, verified:true, at:Date.now()};
-  localStorage.setItem('iv-studio-plus', JSON.stringify(record));
-  return record;
-}
-
-export function readStudioPlus() {
-  try {
-    const value = JSON.parse(localStorage.getItem('iv-studio-plus') || 'null');
-    if (value?.verified === true && value.productId === STORE_PRODUCT_ID) return value;
-  } catch { /* ignore unreadable storage */ }
-  return null;
-}
-
-export function clientSignal(now = Date.now()) {
-  const plus = readStudioPlus();
-  const account = localStorage.getItem('iv-active-account') || 'device';
-  let trials = {};
-  try { trials = JSON.parse(localStorage.getItem('iv-create-trials:' + account) || '{}') || {}; }
-  catch { trials = {}; }
-  return {
-    plan: plus?.plan,
-    pro: plus?.plan === 'pro',
-    verified: plus?.verified === true,
-    productId: plus?.productId,
-    basicTrialUsedAt: trials.basicTrialUsedAt,
-    proTrialUsedAt: trials.proTrialUsedAt,
-    now
-  };
-}
-
-/** Entitlements never mark a charge complete before verify. */
 export function storeBillingReady() {
   return false;
 }
 
 export function selfCheck() {
-  const signedIn = resolveTier({allowed:true, kind:'lifetime'});
-  const basic = resolveTier({plan:'basic'});
-  const pro = resolveTier({plan:'pro'});
-  const free = resolveTier({});
-  if (signedIn !== 'free' || basic !== 'basic' || pro !== 'pro' || free !== 'free') throw Error('Tier resolution failed.');
-  if (canUse('stems', {tier:'basic'}) || !canUse('stems', {tier:'pro'}) || canUse('isolate', {tier:'free'})) throw Error('Pro gate failed.');
-  if (!canUse('ai-tune', {tier:'basic', capabilities:{aiAssist:true}})) throw Error('Existing AI capability should pass the AI gate.');
-  if (canUse('stems', {tier:'basic', capabilities:{aiAssist:true}})) throw Error('AI assist must not unlock stem export.');
-  for (const id of BASIC_FEATURES.map(feature => feature.id)) {
-    if (canUse(id, {tier:'free'})) throw Error('Free unlocked ' + id);
-    if (!canUse(id, {tier:'basic'}) || !canUse(id, {tier:'pro'})) throw Error('Paid tier missing ' + id);
+  if (resolveTier({allowed:true, kind:'lifetime'}) !== 'free') throw Error('Signed-in became a paid plan.');
+  if (resolveTier({plan:'infectious'}) !== 'free' || resolveTier({kind:'plague', plan:'pro', pro:true, verified:true}) !== 'free') throw Error('Nation social plan unlocked the studio.');
+  if (resolveTier({pro:true, verified:true, productId:'infectedvoices.studio.monthly'}) !== 'free') throw Error('Client flag unlocked Pro.');
+  if (resolveTier({studioPlan:'basic'}) !== 'basic' || resolveTier({studioPlan:'pro'}) !== 'pro') throw Error('Server studio plan was ignored.');
+  if (resolveTier({demoPlan:'pro'}) !== 'pro') throw Error('QA demo flip did not apply.');
+  for (const id of PRO_ONLY) {
+    if (can('free', id) || can('basic', id) || !can('pro', id)) throw Error('Pro gate failed for ' + id);
   }
-  const start = Date.parse('2026-09-01T00:00:00Z');
-  if (resolveTier({basicTrialUsedAt:start}, start + 1000) !== 'basic') throw Error('Basic trial did not start.');
-  if (resolveTier({basicTrialUsedAt:start}, start + TRIAL_MS) !== 'free') throw Error('Basic trial did not expire.');
-  if (resolveTier({proTrialUsedAt:start}, start + 1000) !== 'pro') throw Error('Pro trial did not start.');
-  const again = claimTrial('basic', {basicTrialUsedAt:start}, start + 1000);
-  if (again.ok) throw Error('Basic trial can be claimed twice.');
-  const first = claimTrial('pro', {}, start);
-  if (!first.ok || first.record.proTrialUsedAt !== start) throw Error('Pro trial did not record proTrialUsedAt.');
-  if (tierFromStoreVerify({allowed:true, verified:true, productId:STORE_PRODUCT_ID}) !== 'pro') throw Error('Studio Plus verify did not map to pro.');
-  if (tierFromStoreVerify({allowed:true, productId:STORE_PRODUCT_ID}) !== 'pro') throw Error('Allowed Studio Plus receipt did not map to pro.');
-  if (tierFromStoreVerify({verified:false}) !== 'free') throw Error('Unverified store result mapped to a paid tier.');
-  if (tierFromStoreVerify({allowed:false}) !== 'free') throw Error('Denied store result mapped to a paid tier.');
-  if (lockBody('Export stems') !== 'Export stems is on the $40 Pro plan.') throw Error('Lock sheet copy drifted.');
-  if (lockBody('Project Lab', 'project-lab') !== 'Project Lab is on the $20 Basic plan.') throw Error('Basic lock copy drifted.');
+  for (const id of BASIC_PLUS) {
+    if (can('free', id) || !can('basic', id) || !can('pro', id)) throw Error('Basic gate failed for ' + id);
+  }
+  if (!can('free', 'local_tune')) throw Error('Free local studio was gated.');
+  if (lockBody('Export stems', 'stems') !== 'Export stems is on the $40 Pro plan.') throw Error('Pro lock copy drifted.');
+  if (lockBody('Project Lab', 'project_lab') !== 'Project Lab is on the $20 Basic plan.') throw Error('Basic lock copy drifted.');
   if (storeBillingReady()) throw Error('Entitlements must not mark store billing ready before a verified purchase.');
   return true;
 }

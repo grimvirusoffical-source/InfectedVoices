@@ -9,7 +9,7 @@ const studio=await fs.readFile(path.join(dist,'studio.html'),'utf8');
 if(!studio.includes("mobile-entry.js")||!studio.includes('mobile.css'))throw Error('Studio is not using mobile entry/CSS.');
 if(studio.includes("src='./entry.js'"))throw Error('Web collaboration bootstrap leaked into native studio.');
 const shell=await fs.readFile(path.join(dist,'mobile-shell.js'),'utf8');
-for(const marker of ['saveFile','signIn','hostCheck','checkUpdates','nation.infectedvoices.space','purchaseSubscription','infectedvoices.studio.monthly','/api/health','0.6.6-mobile.2','Authorization'])if(!shell.includes(marker))throw Error('Mobile bridge missing '+marker);
+for(const marker of ['saveFile','signIn','hostCheck','checkUpdates','nation.infectedvoices.space','purchaseSubscription','space.infectedvoices.studio.basic.monthly','space.infectedvoices.studio.pro.monthly','iv_studio_basic','iv_studio_pro','/api/health','0.6.6-mobile.2','Authorization'])if(!shell.includes(marker))throw Error('Mobile bridge missing '+marker);
 const entry=await fs.readFile(path.join(dist,'mobile-entry.js'),'utf8');
 if(entry.includes('Core6Collaboration'))throw Error('Unreleased Core 6 collaboration bootstrap leaked into the Core 5 mobile release.');
 const chrome=await fs.readFile(path.join(dist,'mobile-chrome.js'),'utf8');

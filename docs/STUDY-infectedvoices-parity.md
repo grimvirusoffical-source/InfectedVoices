@@ -37,7 +37,7 @@ Core 5 audio engine is intentionally shared. Gaps are mostly **I/O, permissions,
 | Account / access | Desktop account | HTTPS identity | Keychain session + HTTPS allowlist | Encrypted prefs + HTTPS | No cleartext; host switch HTTPS-only |
 | Collaboration (Core 6) | In the 0.6.6-core6.1 vendor | Files in `dist/`; browser may keep collab | **Not bootstrapped.** Optional flag off | **Not bootstrapped.** Optional flag off | Store build rebrands the pilot and does not import it |
 | Self-updater | Windows updater | Service worker / host deploy | **App Store only** — no sideload studio JS | **Play only** | Do not reintroduce web updater in Cap |
-| Payments in-app | Stripe OK on web/desktop | Stripe OK on the browser host | Studio Plus via StoreKit. No Stripe button. Verified receipt is Pro | Studio Plus via Play Billing. No Stripe button. Verified receipt is Pro | Product `infectedvoices.studio.monthly`. Signed-in is Free until Basic, Pro, or a 7-day trial |
+| Payments in-app | Stripe OK on web/desktop | Stripe OK on the browser host | Basic and Pro via StoreKit. No Stripe button. Free has no product | Basic and Pro via Play Billing. No Stripe button. Free has no product | iOS `space.infectedvoices.studio.basic.monthly` and `space.infectedvoices.studio.pro.monthly`. Android `iv_studio_basic` and `iv_studio_pro`. Signed-in is Free until server `studioPlan` is basic or pro |
 | Deep link studio | n/a | URL | `infectedvoices://studio` | same | Validated by app bridge |
 | Background / audio session | Full | Browser suspend risk | Needs AVAudioSession QA | Needs AudioFocus QA | Real device only |
 
