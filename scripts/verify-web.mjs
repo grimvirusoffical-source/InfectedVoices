@@ -24,7 +24,7 @@ if(!font?.isFile()||font.size<1000)throw Error('Inter font missing from mobile w
 const create=await fs.readFile(path.join(dist,'mobile-create.js'),'utf8');
 const entitlements=await fs.readFile(path.join(dist,'entitlements.js'),'utf8');
 const flow=create+'\n'+entitlements;
-for(const marker of ['ivModeCreate','ivModeStudio','Unlock with Pro','Maybe later','Try Basic free for 7 days','Try Pro free for 7 days','Subscribe Basic $20/mo','Subscribe Pro $40/mo','basicTrialUsedAt','proTrialUsedAt','Trial ends','Aim lead peaks around','Delivery note','Included in Basic $20','Preview, then Keep','Tour complete — open Studio for advanced.','Open advanced settings','Export stems','AI Beat-Lock','Vocal isolation'])if(!flow.includes(marker))throw Error('Create flow missing '+marker);
+for(const marker of ['ivModeCreate','ivModeStudio','Unlock Pro','needs Pro','Maybe later','Try Basic free for 7 days','Try Pro free for 7 days','Subscribe Basic $20/mo','Subscribe Pro $40/mo','basicTrialUsedAt','proTrialUsedAt','Trial ends','44.1 kHz · 16-bit','48 kHz · 24-bit','Open full Studio','Aim lead peaks around','Delivery note','Included in Basic $20','Preview, then Keep','Tour complete — open Studio for advanced.','Open advanced settings','Export stems','AI Beat-Lock','Vocal isolation','Prepare'])if(!flow.includes(marker))throw Error('Create flow missing '+marker);
 const {selfCheck}=await import('../mobile-src/entitlements.js');
 selfCheck();
 const download=await fs.readFile(path.join(root,'download','index.html'),'utf8');

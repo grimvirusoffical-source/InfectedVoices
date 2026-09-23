@@ -14,7 +14,7 @@ Pricing source of truth: `docs/STUDY-infectedvoices-pricing.md`. Producer bar: `
 | Basic ($20) | Full local pro: Precision Tune, Precision Pocket, GRIM, Core 5 automation, Core 5 master, 24-bit WAV, Smart Mix + Master, Project Lab, and portable `.ivproject`. Default export is **48 kHz / 24-bit** |
 | Pro ($40) | Everything in Basic, plus stems, AI mix/master, AI auto-tune, AI beat-lock, and vocal isolation |
 
-Cloud AI stays a real `503` with `provider_not_configured`. The app does not invent a bounce. `/get` and `/download` are the same page: App Store and Google Play only (no ipa, no aab), Windows signed with SHA-256 beside the installer, open web goes to `/voices`, and there is no Mac `.app`. The GitHub zipball is source, not the Windows installer.
+Cloud AI stays a real `503` with `provider_not_configured`. The app does not invent a bounce. `/get` and `/download` are the same page: cards for Windows, iOS, Android, and the web app. App Store and Google Play only (no ipa, no aab), Windows signed with SHA-256 beside the installer, open web goes to `/voices` and `/studio`, and there is no Mac `.app`. The GitHub zipball is source, not the Windows app. Browser `studio.html` mounts the same Create | Studio chrome as Cap. A Windows desktop shell is not in this repo.
 
 ## Already in the Capacitor app
 

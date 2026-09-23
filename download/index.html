@@ -6,15 +6,26 @@
   <meta name="theme-color" content="#09090B">
   <title>Get Infected Voices</title>
   <style>
-    :root{color-scheme:dark;--bg:#09090B;--surface:#111113;--text:#FAFAFA;--muted:#A1A1AA;--border:#27272A;--accent:#6E79D6}
+    :root{color-scheme:dark;--bg:#09090B;--surface:#111113;--elev:#18181B;--text:#FAFAFA;--muted:#A1A1AA;--faint:#71717A;--border:#27272A;--border-strong:#3F3F46;--accent:#6E79D6;--accent-hover:#828FFF}
+    *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 Inter,ui-sans-serif,system-ui,sans-serif}
-    main{max-width:720px;margin:0 auto;padding:32px 20px 64px}
+    main{max-width:1080px;margin:0 auto;padding:32px 20px 64px}
     h1{font-size:32px;letter-spacing:-.04em;margin:0 0 8px}
+    h2{margin:0 0 6px;font-size:18px;letter-spacing:-.02em}
     p,li{color:var(--muted)}
     a{color:var(--accent)}
-    article{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin:12px 0}
-    h2{margin:0 0 6px;font-size:18px}
+    a:hover{color:var(--accent-hover)}
+    .plans,.cards{display:grid;gap:12px}
+    article{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px}
+    article h2{color:var(--text)}
+    .cta{display:inline-flex;align-items:center;min-height:44px;margin-top:8px;padding:0 14px;border-radius:10px;background:var(--accent);color:#fff;text-decoration:none}
+    .cta:hover{background:var(--accent-hover);color:#fff}
     code{color:var(--text)}
+    .note{color:var(--faint);font-size:13px}
+    @media (min-width:800px){
+      .plans{grid-template-columns:1fr 1fr 1fr}
+      .cards{grid-template-columns:1fr 1fr}
+    }
   </style>
 </head>
 <body>
@@ -22,26 +33,46 @@
     <p>Infected Voices</p>
     <h1>Get the app</h1>
     <p>This page is <code>/get</code> and <code>/download</code>. It does not host raw store binaries.</p>
-    <article>
-      <h2>iPhone and iPad</h2>
-      <p>App Store only. This page does not offer an ipa.</p>
-    </article>
-    <article>
-      <h2>Android</h2>
-      <p>Google Play only. This page does not offer an aab.</p>
-    </article>
-    <article>
-      <h2>Windows</h2>
-      <p>The Windows build is signed. Its SHA-256 is published beside that installer. The GitHub source zipball is source, not the Windows app.</p>
-    </article>
-    <article>
-      <h2>Mac</h2>
-      <p>No Mac .app is published.</p>
-    </article>
-    <article>
-      <h2>Open web</h2>
-      <p><a href="/voices">Open web</a> at <code>/voices</code>.</p>
-    </article>
+    <section class="plans" aria-label="Plans">
+      <article>
+        <h2>Free</h2>
+        <p>Ongoing floor. Record, local tune and pocket, Core 3, MP3, and labeled 16-bit WAV. Not a trial.</p>
+      </article>
+      <article>
+        <h2>Basic · $20/mo</h2>
+        <p>Full local pro studio. One 7-day Basic trial per account, then Free unless you subscribe.</p>
+      </article>
+      <article>
+        <h2>Pro · $40/mo</h2>
+        <p>Basic plus stems, AI mix, AI tune, AI beat-lock, and vocal isolation. One 7-day Pro trial per account.</p>
+      </article>
+    </section>
+    <section class="cards" aria-label="Platforms">
+      <article>
+        <h2>Windows</h2>
+        <p>The Windows build is signed. Its SHA-256 is published beside that installer. The installer URL is a placeholder until the signed build is posted. The GitHub source zipball is source, not the Windows app.</p>
+        <a class="cta" href="https://github.com/grimvirusoffical-source/InfectedVoices/releases">Windows installer placeholder</a>
+      </article>
+      <article>
+        <h2>iOS</h2>
+        <p>App Store only. This page does not offer an ipa.</p>
+        <a class="cta" href="https://apps.apple.com/">App Store placeholder</a>
+      </article>
+      <article>
+        <h2>Android</h2>
+        <p>Google Play only. This page does not offer an aab.</p>
+        <a class="cta" href="https://play.google.com/store">Google Play placeholder</a>
+      </article>
+      <article>
+        <h2>Web app</h2>
+        <p><a href="/voices">Open in browser</a> at <code>/voices</code>. The studio workstation is <a href="/studio">/studio</a>.</p>
+      </article>
+      <article>
+        <h2>Mac</h2>
+        <p>No Mac .app is published.</p>
+      </article>
+    </section>
+    <p class="note">Cap buys Basic and Pro only in the App Store or Google Play. This page has no Stripe checkout.</p>
   </main>
 </body>
 </html>

@@ -11,19 +11,29 @@ const COACH = [
   {id:'export', view:'export', title:'Export', body:'The delivery note prints integrated LUFS, true peak, sample rate, bit depth, and BPM. Free export is 16-bit. Stems — Included in Pro $40.', cta:'Export song', run:'exportWav'}
 ];
 const CHECKS = [
+  {id:'prepare', label:'Prepare', view:'home'},
+  {id:'record', label:'Record', view:'record'},
+  {id:'tune', label:'Tune', view:'tune'},
+  {id:'mix', label:'Mix', view:'mix'},
+  {id:'master', label:'Master', view:'mix'},
+  {id:'export', label:'Export', view:'export'}
+];
+const NAV = [
+  {id:'home', label:'Home'},
   {id:'record', label:'Record'},
   {id:'tune', label:'Tune'},
   {id:'mix', label:'Mix'},
   {id:'export', label:'Export'}
 ];
-const BASIC_ACTIONS = [
-  {id:'tune', title:'Auto-Tune', copy:'Clean pitch, still sounds like you', run:'autoTune'},
-  {id:'beat', title:'Lock to Beat', copy:'Nudge timing to the pocket', run:'lockBeat'},
-  {id:'mix', title:'Smart Mix + Master', copy:'Radio-ready loudness, fast', run:'smartMix'}
-];
-const PRO_ACTIONS = [
-  {id:'isolate', title:'Isolate Vocal', copy:'Pull the vocal stem'},
-  {id:'stems', title:'Export stems', copy:'Every track as WAV'}
+const HOME_ACTIONS = [
+  {title:'Auto-Tune', copy:'Clean pitch, still sounds like you', run:'autoTune', advanced:'tune'},
+  {title:'Lock to Beat', copy:'Nudge timing to the pocket', run:'lockBeat', advanced:'beat'},
+  {title:'Smart Mix + Master', copy:'Radio-ready loudness, fast', run:'smartMix', advanced:'mix'},
+  {title:'AI Auto-Tune', copy:'Model pitch on the take', ai:'ai-tune', pro:true, advanced:'tune'},
+  {title:'AI Beat-Lock', copy:'Quality-preserving on-beat', ai:'ai-beat', pro:true, advanced:'beat'},
+  {title:'AI Mix + Master', copy:'RoEx loudness when a provider is configured', ai:'ai-mix', pro:true, advanced:'mix'},
+  {title:'Isolate', copy:'Pull the vocal stem', ai:'isolate', pro:true, advanced:'producer'},
+  {title:'Export stems', copy:'Every track as WAV', run:'exportStems', pro:true, advanced:'export'}
 ];
 const GUARDS = {
   'Export aligned processed stems':'stems',
@@ -75,10 +85,19 @@ export async function mountCreate({shell, config}) {
   createTab.id = 'ivModeCreate';
   studioTab.id = 'ivModeStudio';
   modeSwitch.append(createTab, studioTab);
+  const brand = E('span', 'Infected Voices');
+  brand.className = 'iv-brand';
+  const planChip = E('button', 'Free');
+  planChip.type = 'button';
+  planChip.id = 'ivPlanChip';
+  planChip.className = 'iv-plan-chip';
+  planChip.onclick = () => { setMode('create'); showView('subscribe'); };
+  const toxins = E('span', 'Toxins? n/a');
+  toxins.className = 'iv-toxins';
   const more = E('button', 'More');
   more.type = 'button';
   more.id = 'ivMore';
-  rail.append(modeSwitch, more);
+  rail.append(brand, modeSwitch, planChip, toxins, more);
   const header = document.querySelector('.app-header') || document.querySelector('.mobile-classic-top') || document.body;
   header.append(rail);
 
@@ -110,7 +129,7 @@ export async function mountCreate({shell, config}) {
   nav.id = 'ivCreateNav';
   nav.className = 'iv-create-nav';
   nav.setAttribute('aria-label', 'Create steps');
-  for (const item of [{id:'home', label:'Home'}, ...CHECKS]) {
+  for (const item of NAV) {
     const button = E('button', item.label);
     button.type = 'button';
     button.dataset.view = item.id;
@@ -211,6 +230,16 @@ export async function mountCreate({shell, config}) {
     return false;
   }
   function arrangement() { return !!document.getElementById('steps'); }
+  function planChipLabel() {
+    const state = access();
+    if (state.trialPlan && state.trialEnd > Date.now()) {
+      const days = Math.max(1, Math.ceil((state.trialEnd - Date.now()) / 86400000));
+      return (state.trialPlan === 'pro' ? 'Pro trial' : 'Basic trial') + ' · ' + days + 'd';
+    }
+    if (state.tier === 'pro') return 'Pro';
+    if (state.tier === 'basic') return 'Basic';
+    return 'Free';
+  }
   function allDone() { return CHECKS.every(item => checks[item.id]); }
 
   function applyChrome() {
@@ -220,6 +249,7 @@ export async function mountCreate({shell, config}) {
     studioTab.setAttribute('aria-selected', mode === 'studio' ? 'true' : 'false');
     root.hidden = !(mode === 'create' && surfaceReady());
     nav.hidden = root.hidden;
+    planChip.textContent = planChipLabel();
     for (const button of nav.querySelectorAll('button')) button.classList.toggle('is-current', button.dataset.view === view);
   }
 
@@ -283,6 +313,8 @@ export async function mountCreate({shell, config}) {
     const choose = document.getElementById('audioFiles');
     if (choose) choose.click();
     else clickNamed('Import audio');
+    checks.prepare = true;
+    saveChecks();
     toastMessage('Import a beat to set the grid and BPM. Studio tracks stay available.', () => openAdvanced('beat'));
   }
   async function openComp() {
@@ -405,7 +437,7 @@ export async function mountCreate({shell, config}) {
     }
     checks.export = true;
     saveChecks();
-    const bitsLabel = bits === 24 ? '24-bit' : '16-bit';
+    const bitsLabel = bits === 24 ? '48 kHz · 24-bit' : '44.1 kHz · 16-bit';
     toastMessage('Export started. Delivery note: integrated LUFS, true peak, sample rate, ' + bitsLabel + ', and BPM print on the master status. No figure is invented before the bounce.', () => openAdvanced('export'));
     render();
   }
@@ -478,6 +510,8 @@ export async function mountCreate({shell, config}) {
   async function openMaster() {
     if (arrangement()) clickStage(6);
     else openAdvanced('master');
+    checks.master = true;
+    saveChecks();
     if (allowed('core5_master')) {
       toastMessage('Master stage is open. Ceiling starts at −1.0 dBTP. Core 5 prints integrated LUFS and true peak after the bounce. Do not chase one LUFS number.', () => openAdvanced('master'));
     } else {
@@ -491,6 +525,10 @@ export async function mountCreate({shell, config}) {
     toast.replaceChildren();
     toast.append(E('p', text));
     if (keep) {
+      const preview = E('button', 'Preview');
+      preview.type = 'button';
+      preview.className = 'ghost';
+      preview.onclick = () => toastMessage(text, advanced, keep);
       const commit = E('button', 'Keep');
       commit.type = 'button';
       commit.className = 'primary';
@@ -499,7 +537,11 @@ export async function mountCreate({shell, config}) {
         try { await keep(); }
         catch (error) { alert(error.message); }
       };
-      toast.append(commit);
+      const undo = E('button', 'Undo');
+      undo.type = 'button';
+      undo.className = 'ghost';
+      undo.onclick = () => { toast.hidden = true; };
+      toast.append(preview, commit, undo);
     }
     const link = E('button', 'Open advanced settings');
     link.type = 'button';
@@ -524,7 +566,7 @@ export async function mountCreate({shell, config}) {
     const basicGate = BASIC_PLUS.includes(entitlementKey(featureId));
     const kicker = E('p', basicGate ? 'Basic' : 'Pro');
     kicker.className = 'iv-kicker';
-    titles.append(kicker, E('h2', basicGate ? 'Unlock with Basic' : 'Unlock with Pro'));
+    titles.append(kicker, E('h2', basicGate ? 'Unlock Basic' : 'Unlock Pro'));
     const close = E('button', 'Close');
     close.type = 'button';
     close.className = 'iv-sheet-close';
@@ -533,7 +575,7 @@ export async function mountCreate({shell, config}) {
     head.append(titles, close);
     const body = E('div');
     body.className = 'mobile-native-body';
-    body.append(E('p', lockBody(feature?.name || 'This feature', featureId)));
+    body.append(E('p', (feature?.name || 'This feature') + (basicGate ? ' needs Basic. ' : ' needs Pro. ') + lockBody(feature?.name || 'This feature', featureId)));
     const list = E('ul');
     list.className = 'iv-perks';
     for (const item of (basicGate ? BASIC_FEATURES : PRO_FEATURES)) list.append(E('li', item.name));
@@ -637,16 +679,25 @@ export async function mountCreate({shell, config}) {
     if (!moreDialog.open) moreDialog.showModal();
   }
 
-  function card(title, copy, onClick, {pro = false} = {}) {
+  function card(title, copy, onClick, {pro = false, advanced} = {}) {
+    const article = E('article');
+    article.className = 'iv-cta' + (pro ? ' is-pro' : '');
     const button = E('button');
     button.type = 'button';
-    button.className = 'iv-cta' + (pro ? ' is-pro' : '');
     const heading = E('strong', title);
     const line = E('span', copy);
     button.append(heading, line);
-    if (pro) button.append(E('em', 'Pro'));
     button.onclick = onClick;
-    return button;
+    article.append(button);
+    if (pro) article.append(E('em', 'Pro'));
+    if (advanced) {
+      const ghost = E('button', 'Open advanced');
+      ghost.type = 'button';
+      ghost.className = 'ghost';
+      ghost.onclick = () => openAdvanced(advanced);
+      article.append(ghost);
+    }
+    return article;
   }
   function render() {
     applyChrome();
@@ -669,17 +720,15 @@ export async function mountCreate({shell, config}) {
     screen.append(kicker, checklist());
     const grid = E('div');
     grid.className = 'iv-cta-grid';
-    for (const action of BASIC_ACTIONS) grid.append(card(action.title, action.copy, () => runAction(action.run)));
-    for (const action of PRO_ACTIONS) {
-      grid.append(card(action.title, action.copy, () => action.id === 'isolate' ? openAi('isolate') : runAction('exportStems'), {pro:true}));
+    for (const action of HOME_ACTIONS) {
+      const go = action.ai ? () => openAi(action.ai) : () => runAction(action.run);
+      grid.append(card(action.title, action.copy, go, {pro:!!action.pro, advanced:action.advanced}));
     }
-    const note = E('p', 'Sounds good fast — tweak later in Studio');
-    note.className = 'iv-note';
     const open = E('button', 'Open full Studio');
     open.type = 'button';
     open.className = 'primary iv-wide';
     open.onclick = () => setMode('studio');
-    screen.append(grid, note, open);
+    screen.append(grid, open);
     return screen;
   }
   function checklist() {
@@ -703,7 +752,7 @@ export async function mountCreate({shell, config}) {
       mark.className = 'iv-box';
       mark.setAttribute('aria-hidden', 'true');
       button.prepend(mark);
-      button.onclick = () => showView(item.id);
+      button.onclick = () => showView(item.view || item.id);
       list.append(button);
     }
     box.append(list);
@@ -772,7 +821,7 @@ export async function mountCreate({shell, config}) {
     const screen = E('div');
     screen.className = 'iv-screen';
     screen.append(E('h2', 'Export'));
-    const bits = allowed('24-bit') ? '24-bit' : '16-bit';
+    const bits = allowed('24-bit') ? (arrangement() ? '44.1 kHz · 24-bit' : '48 kHz · 24-bit') : '44.1 kHz · 16-bit';
     const heard = document.getElementById('status')?.textContent || '';
     const delivery = heard.startsWith('Delivery note:') ? heard : 'Delivery note prints integrated LUFS, true peak, sample rate, bit depth, and BPM after export. No loudness figure is invented before the bounce.';
     const wav = E('button', 'Export ' + bits + ' WAV');

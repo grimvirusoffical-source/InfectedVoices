@@ -83,6 +83,13 @@ test('delivery note measures a half-scale sine instead of inventing loudness', (
   assert.match(note, /48000 Hz · 16-bit · 140 BPM/)
 })
 
+test('free WAV is labeled 16-bit and basic defaults to 48 kHz 24-bit', () => {
+  const source = readFileSync(new URL('./exportAudio.ts', import.meta.url), 'utf8')
+  assert.match(source, /sampleRate: 44100, bits: 16, label: '44\.1 kHz · 16-bit WAV'/)
+  assert.match(source, /sampleRate: 48000, bits: 24, label: '48 kHz · 24-bit WAV'/)
+  assert.equal(source.includes("label: 'pro"), false)
+})
+
 test('a 7-day trial is once per account and expiry drops Pro', () => {
   const future = Date.now() + 60 * 60 * 1000
   const past = Date.now() - 60 * 60 * 1000

@@ -779,8 +779,9 @@ export default function App() {
             <p>{staged.note}</p>
             <audio src={staged.previewUrl} controls />
             <div className="cta-row">
+              <button onClick={() => { const el = document.querySelector('#ivKeepBar audio'); if (el instanceof HTMLAudioElement) void el.play() }}>Preview</button>
               <button className="primary" onClick={() => void staged.apply()}>Keep</button>
-              <button onClick={() => { clearStage(); setStatus('Preview discarded. The original take is unchanged.') }}>Cancel</button>
+              <button onClick={() => { clearStage(); setStatus('Undo discarded the preview. The original take is unchanged.') }}>Undo</button>
             </div>
           </div>
         )}
@@ -1159,7 +1160,7 @@ export default function App() {
         {tab === 'lab' && !sessionCan('project-lab') && (
           <section className="panel">
             <h2>Project Lab</h2>
-            <p className="panel-lead">Project Lab is included in Basic $20. Free export is 16-bit WAV with a delivery note. Basic and Pro export 48 kHz / 24-bit WAV.</p>
+            <p className="panel-lead">Project Lab is included in Basic $20. Free export is 44.1 kHz · 16-bit WAV with a delivery note. Basic and Pro Smart Mix defaults to 48 kHz / 24-bit WAV.</p>
           </section>
         )}
         {tab === 'lab' && sessionCan('project-lab') && (

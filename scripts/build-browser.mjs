@@ -60,6 +60,8 @@ studio=studio
   .replace(/Continue with Google/g,'Sign in / create account')
   .replace(/This release is a preview; retain project backups\./g,'Keep portable project backups before major edits or updates.');
 if(!studio.includes('auth-choices.js'))studio=studio.replace('</body>','  <script src="./auth-choices.js"></script>\n</body>');
+if(!studio.includes('mobile.css'))studio=studio.replace('</head>','  <link rel="stylesheet" href="./mobile.css">\n</head>');
+if(!studio.includes('create-mount.js'))studio=studio.replace('</body>','  <script type="module" src="./create-mount.js"></script>\n</body>');
 await fs.writeFile(path.join(out,'studio.html'),studio);
 
 const workstationPath=path.join(out,'workstation','app.js');
@@ -79,6 +81,8 @@ const labPath=path.join(out,'lab','index.html');
 let lab=await fs.readFile(labPath,'utf8');
 lab=lab.replace(/<script>if\('serviceWorker'[\s\S]*?<\/script>/g,'');
 if(!lab.includes('auth-choices.js'))lab=lab.replace('</body>','  <script src="../auth-choices.js"></script>\n</body>');
+if(!lab.includes('mobile.css'))lab=lab.replace('</head>','  <link rel="stylesheet" href="../mobile.css">\n</head>');
+if(!lab.includes('create-mount.js'))lab=lab.replace('</body>','  <script type="module" src="../create-mount.js"></script>\n</body>');
 await fs.writeFile(labPath,lab);
 await fs.rm(path.join(out,'sw.js'),{force:true});
 
@@ -102,6 +106,11 @@ if(!indexText.includes('content="0.7.0"'))throw Error('Canonical studio was not 
 for(const required of ['index.html','studio.html','api.js','workstation/app.js','lab/index.html','lab/account-entry.js','favicon.svg','manifest.webmanifest']){
   await fs.access(path.join(out,required));
 }
+for(const file of ['mobile-create.js','entitlements.js','mobile.css']){
+  await fs.copyFile(path.join(root,'mobile-src',file),path.join(out,file));
+}
+await fs.copyFile(path.join(root,'browser-src','create-mount.js'),path.join(out,'create-mount.js'));
+if(!studio.includes('create-mount.js')||!lab.includes('create-mount.js'))throw Error('Browser studio is missing the shared Create chrome.');
 const downloadPage=path.join(root,'download','index.html');
 await fs.mkdir(path.join(out,'get'),{recursive:true});
 await fs.mkdir(path.join(out,'download'),{recursive:true});
