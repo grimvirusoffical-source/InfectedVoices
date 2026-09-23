@@ -148,7 +148,7 @@ export async function mountMobileChrome(){
    ['Precision Tune',gate('precision',()=>clickStage(4))],
    ['Project Lab',gate('project-lab',()=>{location.href='index.html#lab';})],
    ['Pocket',go(()=>clickStage(3))],
-   ['Mastering',go(()=>clickStage(6))],
+   ['Mastering',gate('core5',()=>clickStage(6))],
    ['Export',go(()=>clickStage(7))],
    ['Plugins',go(()=>document.getElementById('pluginsTab')?.click())],
    ['Release & connect',go(()=>document.getElementById('integrationsTab')?.click())],

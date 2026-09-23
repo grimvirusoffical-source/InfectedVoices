@@ -481,7 +481,7 @@ export async function mountCreate({shell, config}) {
       ['Plugins', () => { moreDialog.close(); setMode('studio'); document.getElementById('pluginsTab')?.click(); }],
       ['Release & connect', () => { moreDialog.close(); setMode('studio'); document.getElementById('integrationsTab')?.click(); }],
       ['AI tools', () => { moreDialog.close(); setMode('studio'); document.getElementById('aiTab')?.click(); }],
-      ['Mastering', () => { moreDialog.close(); openAdvanced('master'); }],
+      ['Mastering', gate('core5', () => openAdvanced('master'))],
       ['Export', () => { moreDialog.close(); showView('export'); setMode('create'); }],
       ['Tutorial', () => { moreDialog.close(); setMode('studio'); document.getElementById('tutorial')?.click(); }],
       ['Saved projects', () => { moreDialog.close(); setMode('studio'); document.getElementById('openSaved')?.click(); }],
@@ -858,6 +858,7 @@ export async function mountCreate({shell, config}) {
     if (button.id === 'core5Producer') return 'core5';
     if (button.id === 'exportStem') return 'stems';
     const text = button.textContent.trim();
+    if (button.closest('#steps') && /Master$/.test(text)) return 'core5';
     if (text === 'GRIM rack' || text.startsWith('GRIM')) return 'grim';
     return GUARDS[text] || '';
   }

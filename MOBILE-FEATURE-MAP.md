@@ -12,7 +12,7 @@
 | Shared delay / reverb | Included | Included |
 | Core 5 automation / sidechain | Basic+ (Core 5 Producer). Panels stay visible | Basic+ (Core 5 Producer). Panels stay visible |
 | GRIM rack | Basic+. Free does not turn GRIM on | Basic+. Free does not turn GRIM on |
-| LUFS / true-peak producer mastering | Master stage is in the payload. Smart Mix + Master is Basic+ | Master stage is in the payload. Smart Mix + Master is Basic+ |
+| LUFS / true-peak producer mastering | Master stage and Smart Mix + Master are Basic+. Free does not open them | Master stage and Smart Mix + Master are Basic+. Free does not open them |
 | WAV / stems / project ZIP export | Free export is 16-bit WAV. Basic and Pro default to 48 kHz / 24-bit. Stems are Pro. 256 MB cap | Free export is 16-bit WAV. Basic and Pro default to 48 kHz / 24-bit. Stems are Pro. 256 MB cap |
 | Classic Studio / MP3 encoder | Classic MP3 is Free | Classic MP3 is Free |
 | Existing account / access | InfectedNation handoff (Apple, Google, Android/passkey, email). Studio calls use a Bearer token | InfectedNation handoff (Apple, Google, Android/passkey, email). Studio calls use a Bearer token |

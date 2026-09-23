@@ -20,7 +20,7 @@ Cloud AI stays a real `503` with `provider_not_configured`. The app does not inv
 
 | Function | Where |
 |---|---|
-| Core 1–5 arrangement | `studio.html` — multitrack, import, practice session, journal/recovery, comp/punch, Core 3 mixer, LUFS stage, `.ivproject`. GRIM, Precision Tune, Core 5 Producer, and 24-bit export are **Basic+**. Stems ZIP is **Pro** |
+| Core 1–5 arrangement | `studio.html` — multitrack, import, practice session, journal/recovery, comp/punch, Core 3 mixer, `.ivproject`. GRIM, Precision Tune, Core 5 Producer, the Master stage, and 24-bit export are **Basic+**. Stems ZIP is **Pro** |
 | Classic Studio + MP3 | `lab/index.html` — pocket and master profiles, `lamejs`. Classic MP3 is Free. Vocal stem export is **Pro** |
 | Vocal Lab 0.7.0 home | `dist/index.html` — bar/beat loop, Pocket Assist ±80 ms, Ultimate Mic Master, Grim Beats, local RoEx key field. Project Lab and SMART MIX+MASTER are **Basic+**. Free WAV is 16-bit; Basic and Pro default to 48 kHz / 24-bit |
 | Native share + 256 MB cap | `vocal-bridge.js` → `ivShell.saveFile` |
