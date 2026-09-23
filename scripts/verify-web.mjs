@@ -28,14 +28,35 @@ for(const marker of ['ivModeCreate','ivModeStudio','Unlock Pro','needs Pro','May
 const {selfCheck}=await import('../mobile-src/entitlements.js');
 selfCheck();
 const download=await fs.readFile(path.join(root,'download','index.html'),'utf8');
-for(const marker of ['App Store','Google Play','SHA-256','/voices','No Mac .app','does not offer an ipa','does not offer an aab','not the Windows app','Make vocals that sound finished','Recommended','Download for Windows','Launch studio','Basic $20','Pro $40'])if(!download.includes(marker))throw Error('Download page missing '+marker);
+for(const marker of ['App Store','Google Play','SHA-256','/voices','No Mac .app','does not offer an ipa','does not offer an aab','not the Windows app','Make vocals that sound finished','Recommended','Download for Windows','Launch studio','Basic $20','Pro $40','44.1 kHz · 16-bit','48 kHz · 24-bit'])if(!download.includes(marker))throw Error('Download page missing '+marker);
 const windows=await fs.readFile(path.join(root,'download','windows.html'),'utf8');
-if(!windows.includes('Download .exe')||!windows.includes('SHA-256'))throw Error('Windows download page is missing the installer CTA.');
-const {safeUrl,renderDownload}=await import('./download-pages.mjs');
+if(!windows.includes('Download .exe')||!windows.includes('{{WINDOWS_SHA256}}')||!windows.includes('44.1 kHz · 16-bit')||!windows.includes('48 kHz · 24-bit'))throw Error('Windows download page is missing the installer CTA or delivery labels.');
+const pages={};
+for(const file of ['index.html','windows.html','ios.html','android.html','web.html'])pages[file]=await fs.readFile(path.join(root,'download',file),'utf8');
+const {safeUrl,renderDownload,assertDownloadPages}=await import('./download-pages.mjs');
 if(safeUrl('javascript:alert(1)','https://apps.apple.com/')!=='https://apps.apple.com/')throw Error('Download URLs must reject javascript:.');
 if(safeUrl('//evil.example','/voices/')!=='/voices/')throw Error('Download URLs must reject protocol-relative links.');
-const rendered=renderDownload(download,{});
-if(rendered.includes('{{')||!rendered.includes('https://apps.apple.com/')||!rendered.includes('https://play.google.com/store'))throw Error('Download placeholders were not filled.');
+const rendered=assertDownloadPages(pages,{});
+if(rendered['index.html'].includes('{{')||!rendered['index.html'].includes('https://apps.apple.com/')||!rendered['index.html'].includes('https://play.google.com/store')||!rendered['index.html'].includes('SHA-256'))throw Error('Download placeholders were not filled.');
+const hostile=assertDownloadPages(pages,{
+  IV_APP_STORE_URL:'https://evil.example/InfectedVoices.ipa',
+  IV_PLAY_STORE_URL:'https://evil.example/app.aab',
+  IV_DOWNLOAD_WINDOWS_URL:'https://github.com/grimvirusoffical-source/InfectedVoices/zipball/Release',
+  IV_DOWNLOAD_WEB_URL:'https://evil.example/phish',
+  IV_TESTFLIGHT_URL:'https://evil.example/internal.ipa',
+  IV_DOWNLOAD_WINDOWS_SHA256:'not-a-real-digest'
+});
+if(/href="[^"]*\.(ipa|aab|apk)/i.test(hostile['index.html']+hostile['ios.html']+hostile['android.html']+hostile['windows.html']))throw Error('A raw ipa or aab survived the store allowlist.');
+if(hostile['index.html'].includes('not-a-real-digest')||hostile['index.html'].includes('evil.example'))throw Error('A rejected download URL or digest was printed.');
+const sha='ab'.repeat(32);
+const published=renderDownload(windows,{IV_DOWNLOAD_WINDOWS_SHA256:sha,IV_DOWNLOAD_WINDOWS_URL:'https://app.infectedvoices.space/releases/InfectedVoices-setup.exe'});
+if(!published.includes(sha)||!published.includes('https://app.infectedvoices.space/releases/InfectedVoices-setup.exe'))throw Error('A real Windows SHA-256 or RedX static installer was dropped.');
+const createSrc=await fs.readFile(path.join(root,'mobile-src','mobile-create.js'),'utf8');
+const exportSrc=await fs.readFile(path.join(root,'studio','src','lib','exportAudio.ts'),'utf8');
+const mount=await fs.readFile(path.join(root,'browser-src','create-mount.js'),'utf8');
+for(const marker of ['44.1 kHz · 16-bit','48 kHz · 24-bit','Auto-Tune','Lock to Beat','Smart Mix'])if(!createSrc.includes(marker))throw Error('Shared Create chrome is missing '+marker);
+if(!exportSrc.includes("label: '44.1 kHz · 16-bit WAV'")||!exportSrc.includes("label: '48 kHz · 24-bit WAV'"))throw Error('Vocal Lab export labels drifted from Free 16-bit and Basic+ 48 kHz / 24-bit.');
+if(!mount.includes("from './mobile-create.js'"))throw Error('Browser studio is not mounting the Cap Create chrome.');
 const server=await fs.readFile(path.join(root,'scripts','redx-browser-server.mjs'),'utf8');
 if(!server.includes('pathname==="/get"')||!server.includes('pathname==="/download"'))throw Error('/get is not the same page as /download.');
 if(!server.includes('provider_not_configured')||!server.includes('503'))throw Error('Cloud AI routes must stay real 503s.');

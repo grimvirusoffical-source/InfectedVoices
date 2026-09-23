@@ -35,7 +35,9 @@ h1,h2,h3{color:var(--text)}
 .plans{display:grid;gap:12px;margin-top:28px}
 .plans article{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px}
 .plans h2{margin:0 0 6px;font-size:16px}
-.note,.footer,code{color:var(--faint);font-size:13px}
+.note,.footer,.sha,code{color:var(--faint);font-size:13px}
+.sha{margin:8px 0 0;overflow-wrap:anywhere}
+.sha256{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .shots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0}
 .shot{min-height:120px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);display:flex;align-items:flex-end;padding:10px;color:var(--faint);font-size:12px}
