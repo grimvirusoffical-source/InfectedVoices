@@ -1,10 +1,17 @@
 {
-  "name": "infected-voices-mobile",
-  "version": "0.6.5-mobile.2",
+  "name": "infected-voices",
+  "version": "0.7.0",
   "private": true,
-  "description": "Infected Voices Core 5 native mobile studio for iPhone, iPad and Android",
+  "description": "Infected Voices Studio for the browser, Windows, iPhone, iPad, and Android",
+  "workspaces": [
+    "studio"
+  ],
   "scripts": {
-    "build:web": "node scripts/build-web.mjs && node scripts/verify-web.mjs",
+    "dev": "npm run dev -w infected-voices-studio",
+    "build:web": "node scripts/build-web.mjs",
+    "test": "node --experimental-strip-types --test studio/src/lib/studioFeatures.test.ts",
+    "preview": "npm run preview -w infected-voices-studio -- --host",
+    "package:windows": "npm run build:web && node scripts/package-windows.mjs",
     "native:ios": "npm run build:web && node scripts/prepare-native.mjs ios",
     "sync:ios": "npm run build:web && npx cap sync ios && node scripts/patch-native.mjs ios",
     "open:ios": "npm run sync:ios && npx cap open ios",

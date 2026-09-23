@@ -86,8 +86,8 @@ async function patchAndroid(){
 
   const buildPath=path.join(appDir,'build.gradle');
   let build=await fs.readFile(buildPath,'utf8');
-  build=build.replace(/versionCode\s+\d+/,'versionCode 1');
-  build=build.replace(/versionName\s+["'][^"']+["']/,'versionName "0.6.5"');
+  build=build.replace(/versionCode\s+\d+/,'versionCode 7');
+  build=build.replace(/versionName\s+["'][^"']+["']/,'versionName "0.7.0"');
   await fs.writeFile(buildPath,build);
 
   const densityAssets={

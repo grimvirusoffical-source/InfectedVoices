@@ -1,4 +1,8 @@
-# Infected Voices iOS pinned source
+# Infected Voices pinned sources
+
+The canonical studio is the TypeScript app in `studio/` (version 0.7.0). `npm run build:web` compiles it to `dist/`.
+
+The Core 5 arrangement payload copied to `dist/arrangement/` is still the pinned archive below. The build refuses to extract it if the SHA-256 does not match.
 
 Studio source archive SHA-256:
 

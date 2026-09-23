@@ -1,6 +1,9 @@
 node_modules/
 dist/
 app-source/
+release/
+assets/
+studio/node_modules/
 .DS_Store
 *.xcuserdata
 DerivedData/

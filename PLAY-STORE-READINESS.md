@@ -1,6 +1,6 @@
 # Google Play readiness
 
-The Android project is generated from the same pinned Infected Voices Core 5 studio payload used by the iOS build. CI compiles the native project and produces an unsigned release App Bundle to prove the project builds.
+The Android project packages Studio 0.7.0 plus the pinned Core 5 arrangement payload, the same web bundle the iOS build uses. CI compiles the native project and produces an unsigned release App Bundle to prove the project builds.
 
 ## Required account-side items
 
@@ -19,4 +19,4 @@ The Android project is generated from the same pinned Infected Voices Core 5 stu
 - Cleartext network traffic is disabled and the account-server origin remains HTTPS-only.
 - Deep links use the `infectedvoices://` scheme and are still validated by the app bridge.
 - App updates are store-managed; the packaged app does not use the old web service-worker updater.
-- The store release bootstrap is Core 5 only.
+- The home screen is Studio 0.7.0. Core 5 Arrangement remains inside the same bundle. Unreleased Core 6 collaboration is not bootstrapped.

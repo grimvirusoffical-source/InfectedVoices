@@ -8,7 +8,7 @@ import { Network } from '@capacitor/network';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { SecureStorage } from '@aparajita/capacitor-secure-storage';
 
-const VERSION='0.6.5-ios.1';
+const VERSION='0.7.0';
 const DEFAULT_ORIGIN='https://infectedvoices.space';
 const MAX_EXPORT=268435456;
 let pendingLink=null,lastState={at:Date.now()},authBusy=false;
@@ -39,7 +39,7 @@ await SecureStorage.setKeyPrefix('infectedvoices_').catch(()=>{});
 App.addListener('appUrlOpen',({url})=>{try{const u=new URL(url);if(u.protocol!=='infectedvoices:'||!['auth','collab'].includes(u.hostname))return;pendingLink=url;for(const cb of linkListeners)cb(url);}catch{}});
 
 window.ivShell=Object.freeze({
-  config:async()=>({serverOrigin:await origin(),protocol:(await Preferences.get({key:'iv-protocol'})).value||'device-v1',nativeVersion:VERSION,nativeSequence:2026092201,packaged:true,platform:Capacitor.getPlatform(),updatesConfigured:true,mobile:true,network:(await Network.getStatus()).connected}),
+  config:async()=>({serverOrigin:await origin(),protocol:(await Preferences.get({key:'iv-protocol'})).value||'device-v1',nativeVersion:VERSION,nativeSequence:2026092301,packaged:true,platform:Capacitor.getPlatform(),updatesConfigured:true,mobile:true,network:(await Network.getStatus()).connected}),
   user:currentUser,signIn,signOut,request:accountCall,
   openExternal:async url=>Browser.open({url:allowedExternal(url,await origin()),presentationStyle:'popover'}),
   saveFile,hostCheck,configure,
