@@ -26,7 +26,7 @@ Cap and the browser share the pinned Core 5 vendor payload (`0.6.6-core6.1`). `c
 |---|---|---|
 | Cap iOS and Android | [grimvirusoffical-source/InfectedVoices](https://github.com/grimvirusoffical-source/InfectedVoices) via EAS, then App Store Connect and Play Console (`UPLOAD-APPLE.md`, `UPLOAD-ANDROID.md`) | Store upload stays on this Core repo. Marketing `/get` does not host a raw ipa or aab. |
 | Windows installer | [InfectedVoices-Windows](https://github.com/grimvirusoffical-source/InfectedVoices-Windows) Releases | The repo exists as a README stub. It has no signed installer and no Release asset yet. `/get` links `https://github.com/grimvirusoffical-source/InfectedVoices-Windows/releases` and shows SHA-256. The Core zipball is source, not the Windows app. |
-| Browser | `/voices/` and the `/get` hub | Built by `npm run build:browser` in Core. |
+| Browser | `/voices/` and the `/get` hub | Built by `npm run build:browser` in Core. Cap does not mount that hub. More → Get the apps opens `https://nation.infectedvoices.space/get`. |
 | Mac | Open web | No `InfectedVoices-Mac` repo. No Mac `.app` and no Mac Cap target. A Mac user-agent recommends the Open web card. `/get/mac` only launches `/voices/`. |
 
 The four shell repos exist. This PR does not fork DSP into them. Store builds and a signed Windows Release still wait until Stress clears Core. This PR does not upload them.

@@ -612,6 +612,12 @@ export async function mountCreate({shell, config}) {
   function openStore(tier) {
     if (typeof window.ivOpenNativeStore === 'function') window.ivOpenNativeStore(tier);
   }
+  function openPublicGet() {
+    const origin = String(config.nationOrigin || 'https://nation.infectedvoices.space').replace(/\/+$/, '');
+    const url = origin + '/get';
+    if (typeof shell.openExternal === 'function') shell.openExternal(url);
+    else window.open(url, '_blank', 'noopener');
+  }
   function openProjectLab() {
     if (!allowed('project-lab')) return openLock('project-lab');
     location.href = (arrangement() ? 'index.html' : '../index.html') + '#lab';
@@ -641,6 +647,7 @@ export async function mountCreate({shell, config}) {
       [arrangement() ? 'Classic Studio' : 'Arrangement Studio', () => { location.href = arrangement() ? 'lab/index.html' : '../studio.html'; }],
       ['Vocal Lab', () => { location.href = arrangement() ? 'index.html' : '../index.html'; }],
       ['Subscribe', () => { moreDialog.close(); setMode('create'); showView('subscribe'); }],
+      ['Get the apps', () => { moreDialog.close(); openPublicGet(); }],
       ['Studio Plus', () => { moreDialog.close(); openStore(); }]
     ];
     moreDialog.replaceChildren();
@@ -847,7 +854,7 @@ export async function mountCreate({shell, config}) {
     screen.append(kicker, E('h2', 'Free, Basic, and Pro'));
     const plans = E('div');
     plans.className = 'iv-plans';
-    plans.append(planCard('free', 'Free', '$0', ['Record and arrange', 'Local InfectedTune and Pocket', 'Core 3 mix', 'MP3 and 16-bit WAV']));
+    plans.append(planCard('free', 'Free', 'Included', ['Record and arrange', 'Local InfectedTune and Pocket', 'Core 3 mix', 'MP3 and 16-bit WAV']));
     plans.append(planCard('basic', 'Basic', '$20', BASIC_FEATURES.map(feature => feature.name)));
     plans.append(planCard('pro', 'Pro', '$40', PRO_FEATURES.map(feature => feature.name)));
     screen.append(plans);
