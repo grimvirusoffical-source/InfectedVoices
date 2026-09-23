@@ -28,7 +28,14 @@ for(const marker of ['ivModeCreate','ivModeStudio','Unlock Pro','needs Pro','May
 const {selfCheck}=await import('../mobile-src/entitlements.js');
 selfCheck();
 const download=await fs.readFile(path.join(root,'download','index.html'),'utf8');
-for(const marker of ['App Store','Google Play','SHA-256','/voices','No Mac .app','does not offer an ipa','does not offer an aab','not the Windows app'])if(!download.includes(marker))throw Error('Download page missing '+marker);
+for(const marker of ['App Store','Google Play','SHA-256','/voices','No Mac .app','does not offer an ipa','does not offer an aab','not the Windows app','Make vocals that sound finished','Recommended','Download for Windows','Launch studio','Basic $20','Pro $40'])if(!download.includes(marker))throw Error('Download page missing '+marker);
+const windows=await fs.readFile(path.join(root,'download','windows.html'),'utf8');
+if(!windows.includes('Download .exe')||!windows.includes('SHA-256'))throw Error('Windows download page is missing the installer CTA.');
+const {safeUrl,renderDownload}=await import('./download-pages.mjs');
+if(safeUrl('javascript:alert(1)','https://apps.apple.com/')!=='https://apps.apple.com/')throw Error('Download URLs must reject javascript:.');
+if(safeUrl('//evil.example','/voices/')!=='/voices/')throw Error('Download URLs must reject protocol-relative links.');
+const rendered=renderDownload(download,{});
+if(rendered.includes('{{')||!rendered.includes('https://apps.apple.com/')||!rendered.includes('https://play.google.com/store'))throw Error('Download placeholders were not filled.');
 const server=await fs.readFile(path.join(root,'scripts','redx-browser-server.mjs'),'utf8');
 if(!server.includes('pathname==="/get"')||!server.includes('pathname==="/download"'))throw Error('/get is not the same page as /download.');
 if(!server.includes('provider_not_configured')||!server.includes('503'))throw Error('Cloud AI routes must stay real 503s.');

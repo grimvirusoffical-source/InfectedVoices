@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { applyStripeSubscription, emptyBilling } from "./stripe-subscription.mjs";
+import { DOWNLOAD_ROUTES, renderDownload } from "./download-pages.mjs";
 import { mkdirSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -247,9 +248,15 @@ const server=Bun.serve({
   hostname:HOST,port:PORT,
   async fetch(req){
     const url=new URL(req.url);
-    if(url.pathname==="/get"||url.pathname==="/get/"||url.pathname==="/download"||url.pathname==="/download/"){
-      const page=Bun.file(resolve(fileURLToPath(new URL("../download/index.html",import.meta.url))));
-      return new Response(page,{headers:{"content-type":"text/html; charset=utf-8","x-content-type-options":"nosniff"}});
+    const downloadName=DOWNLOAD_ROUTES[url.pathname];
+    if(downloadName||url.pathname==="/get"||url.pathname==="/download"){
+      const name=downloadName||"index.html";
+      const page=Bun.file(resolve(fileURLToPath(new URL("../download/"+name,import.meta.url))));
+      if(!(await page.exists()))return new Response("Not found.",{status:404});
+      const raw=await page.text();
+      const body=name.endsWith(".html")?renderDownload(raw):raw;
+      const type=name.endsWith(".css")?"text/css; charset=utf-8":name.endsWith(".js")?"text/javascript; charset=utf-8":"text/html; charset=utf-8";
+      return new Response(body,{headers:{"content-type":type,"x-content-type-options":"nosniff","cache-control":"no-store"}});
     }
     if(url.pathname.startsWith("/api/"))return api(req,url);
     let target=staticPath(url.pathname);

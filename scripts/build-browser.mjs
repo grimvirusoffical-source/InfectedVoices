@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { build } from 'esbuild';
 import { patchProducerDelivery } from './patch-producer-delivery.mjs';
+import { publishDownloadPages } from './download-pages.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const source=path.join(root,'app-source');
@@ -111,9 +112,5 @@ for(const file of ['mobile-create.js','entitlements.js','mobile.css']){
 }
 await fs.copyFile(path.join(root,'browser-src','create-mount.js'),path.join(out,'create-mount.js'));
 if(!studio.includes('create-mount.js')||!lab.includes('create-mount.js'))throw Error('Browser studio is missing the shared Create chrome.');
-const downloadPage=path.join(root,'download','index.html');
-await fs.mkdir(path.join(out,'get'),{recursive:true});
-await fs.mkdir(path.join(out,'download'),{recursive:true});
-await fs.copyFile(downloadPage,path.join(out,'get','index.html'));
-await fs.copyFile(downloadPage,path.join(out,'download','index.html'));
+await publishDownloadPages(root, out);
 console.log('Prepared Infected Voices browser payload in browser-dist/');

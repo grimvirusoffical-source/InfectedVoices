@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import {patchProducerDelivery} from './patch-producer-delivery.mjs';
+import {publishDownloadPages} from './download-pages.mjs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {build} from 'esbuild';
@@ -55,10 +56,6 @@ let vocalIndex=await fs.readFile(path.join(out,'index.html'),'utf8');
 if(!vocalIndex.includes('content="0.7.0"'))throw Error('Vocal Lab build did not replace the Cap home page.');
 if(!vocalIndex.includes('vocal-bridge.js'))vocalIndex=vocalIndex.replace('</body>','  <script type="module" src="./vocal-bridge.js"></script>\n</body>');
 await fs.writeFile(path.join(out,'index.html'),vocalIndex);
-const downloadPage=path.join(root,'download','index.html');
-await fs.mkdir(path.join(out,'get'),{recursive:true});
-await fs.mkdir(path.join(out,'download'),{recursive:true});
-await fs.copyFile(downloadPage,path.join(out,'get','index.html'));
-await fs.copyFile(downloadPage,path.join(out,'download','index.html'));
+await publishDownloadPages(root, out);
 await patchProducerDelivery(path.join(out,'workstation','app.js'));
 console.log('Prepared Infected Voices Core 5 mobile web payload in dist/');
