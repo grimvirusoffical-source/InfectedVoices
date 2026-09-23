@@ -774,21 +774,19 @@ export async function mountCreate({shell, config}) {
     tick();
     clockTimer = setInterval(tick, 250);
   }
-  function bindGuards() {
-    for (const button of document.querySelectorAll('button')) {
-      if (button.closest('#ivCreate, #ivCoach, #ivLockSheet, #ivMoreSheet, #ivToast, .iv-rail, #ivCreateNav')) continue;
-      const feature = button.id === 'exportStem' ? 'stems' : GUARDS[button.textContent.trim()];
-      if (!feature || button.dataset.ivGuard === feature) continue;
-      button.dataset.ivGuard = feature;
-      button.addEventListener('click', event => {
-        if (allowed(feature)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        openLock(feature);
-      }, true);
-    }
+  function guardedFeature(button) {
+    if (!button || button.closest('#ivCreate, #ivCoach, #ivLockSheet, #ivMoreSheet, #ivToast, .iv-rail, #ivCreateNav')) return '';
+    return button.id === 'exportStem' ? 'stems' : (GUARDS[button.textContent.trim()] || '');
   }
+  document.addEventListener('click', event => {
+    const button = event.target.closest?.('button');
+    const feature = guardedFeature(button);
+    if (!feature || allowed(feature)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    openLock(feature);
+  }, true);
   function sync() {
     const previous = accountKey;
     loadAccount();
@@ -797,7 +795,6 @@ export async function mountCreate({shell, config}) {
     }
     applyChrome();
     render();
-    bindGuards();
     maybeCoach();
   }
 
@@ -810,15 +807,24 @@ export async function mountCreate({shell, config}) {
       wasRecording = on;
     }).observe(recordButton, {attributes:true, attributeFilter:['class']});
   }
-  const watch = document.getElementById('appShell') || document.getElementById('studioShell') || document.body;
-  new MutationObserver(() => {
-    bindGuards();
-    const user = window.ivStudioBridge?.currentUser?.() || {};
-    const next = String(user.userId || user.id || user.email || 'device');
-    if (next !== accountKey) { sync(); return; }
-    applyChrome();
-    if (surfaceReady()) maybeCoach();
-  }).observe(watch, {attributes:true, childList:true, subtree:true});
+  const watch = document.getElementById('appShell') || document.getElementById('studioShell');
+  if (watch) {
+    new MutationObserver(() => {
+      const user = window.ivStudioBridge?.currentUser?.() || {};
+      const next = String(user.userId || user.id || user.email || 'device');
+      if (next !== accountKey) { sync(); return; }
+      applyChrome();
+      if (surfaceReady()) maybeCoach();
+    }).observe(watch, {attributes:true, attributeFilter:['hidden']});
+  }
+  const badge = document.getElementById('accessBadge');
+  if (badge) {
+    new MutationObserver(() => {
+      const user = window.ivStudioBridge?.currentUser?.() || {};
+      const next = String(user.userId || user.id || user.email || 'device');
+      if (next !== accountKey) sync();
+    }).observe(badge, {childList:true, characterData:true, subtree:true});
+  }
   const guide = document.getElementById('guideDialog');
   if (guide) {
     guide.addEventListener('close', () => maybeCoach());
@@ -828,7 +834,6 @@ export async function mountCreate({shell, config}) {
   if (location.hash === '#mp3') view = 'export';
   loadAccount();
   render();
-  bindGuards();
   maybeCoach();
   return {setMode, openCoach, openLock, tier, allowed};
 }
