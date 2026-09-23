@@ -28,7 +28,8 @@ for(const marker of ['ivModeCreate','ivModeStudio','Unlock with Pro','Get Pro â€
 const {selfCheck}=await import('../mobile-src/entitlements.js');
 selfCheck();
 const download=await fs.readFile(path.join(root,'download','index.html'),'utf8');
-for(const marker of ['App Store','Google Play','SHA-256','/voices','No Mac .app','does not offer an ipa','does not offer an aab','not the Windows app'])if(!download.includes(marker))throw Error('Download page missing '+marker);
+for(const marker of ['App Store','Google Play','Windows installer from Releases when available','View Windows Releases','https://github.com/grimvirusoffical-source/InfectedVoices-Windows/releases/latest','/voices','No Mac .app','does not offer an ipa','does not offer an aab','not the Windows app'])if(!download.includes(marker))throw Error('Download page missing '+marker);
+if(/signed/i.test(download)||/sha-?256/i.test(download))throw Error('Download page must not claim a signed Windows build or publish a checksum before an Authenticode Release exists.');
 const server=await fs.readFile(path.join(root,'scripts','redx-browser-server.mjs'),'utf8');
 if(!server.includes('pathname==="/get"')||!server.includes('pathname==="/download"'))throw Error('/get is not the same page as /download.');
 if(!server.includes('provider_not_configured')||!server.includes('503'))throw Error('Cloud AI routes must stay real 503s.');
