@@ -37,7 +37,8 @@ const {safeUrl,renderDownload,assertDownloadPages}=await import('./download-page
 if(safeUrl('javascript:alert(1)','https://apps.apple.com/')!=='https://apps.apple.com/')throw Error('Download URLs must reject javascript:.');
 if(safeUrl('//evil.example','/voices/')!=='/voices/')throw Error('Download URLs must reject protocol-relative links.');
 const rendered=assertDownloadPages(pages,{});
-if(rendered['index.html'].includes('{{')||!rendered['index.html'].includes('https://apps.apple.com/')||!rendered['index.html'].includes('https://play.google.com/store')||!rendered['index.html'].includes('SHA-256'))throw Error('Download placeholders were not filled.');
+if(rendered['index.html'].includes('{{')||!rendered['index.html'].includes('https://apps.apple.com/')||!rendered['index.html'].includes('https://play.google.com/store')||!rendered['index.html'].includes('https://github.com/grimvirusoffical-source/InfectedVoices-Windows/releases')||!rendered['index.html'].includes('SHA-256'))throw Error('Download placeholders were not filled.');
+if(rendered['index.html'].includes('data-platform="mac"')||/href="https:\/\/apps\.apple\.com/.test(rendered['mac.html']))throw Error('Mac must recommend Open web, not an App Store app.');
 const hostile=assertDownloadPages(pages,{
   IV_APP_STORE_URL:'https://evil.example/InfectedVoices.ipa',
   IV_PLAY_STORE_URL:'https://evil.example/app.aab',
@@ -49,8 +50,10 @@ const hostile=assertDownloadPages(pages,{
 if(/href="[^"]*\.(ipa|aab|apk)/i.test(hostile['index.html']+hostile['ios.html']+hostile['android.html']+hostile['windows.html']))throw Error('A raw ipa or aab survived the store allowlist.');
 if(hostile['index.html'].includes('not-a-real-digest')||hostile['index.html'].includes('evil.example'))throw Error('A rejected download URL or digest was printed.');
 const sha='ab'.repeat(32);
-const published=renderDownload(windows,{IV_DOWNLOAD_WINDOWS_SHA256:sha,IV_DOWNLOAD_WINDOWS_URL:'https://app.infectedvoices.space/releases/InfectedVoices-setup.exe'});
-if(!published.includes(sha)||!published.includes('https://app.infectedvoices.space/releases/InfectedVoices-setup.exe'))throw Error('A real Windows SHA-256 or RedX static installer was dropped.');
+const published=renderDownload(windows,{IV_DOWNLOAD_WINDOWS_SHA256:sha,IV_DOWNLOAD_WINDOWS_URL:'https://github.com/grimvirusoffical-source/InfectedVoices-Windows/releases/download/v1/InfectedVoices-setup.exe'});
+if(!published.includes(sha)||!published.includes('InfectedVoices-Windows/releases/download/v1/InfectedVoices-setup.exe'))throw Error('The Windows Releases installer was dropped.');
+const coreRelease=renderDownload(windows,{IV_DOWNLOAD_WINDOWS_URL:'https://github.com/grimvirusoffical-source/InfectedVoices/releases'});
+if(coreRelease.includes('github.com/grimvirusoffical-source/InfectedVoices/releases'))throw Error('The Core repo Releases page is not the Windows installer.');
 const createSrc=await fs.readFile(path.join(root,'mobile-src','mobile-create.js'),'utf8');
 const exportSrc=await fs.readFile(path.join(root,'studio','src','lib','exportAudio.ts'),'utf8');
 const mount=await fs.readFile(path.join(root,'browser-src','create-mount.js'),'utf8');
@@ -61,8 +64,10 @@ const browserBuild=await fs.readFile(path.join(root,'scripts','build-browser.mjs
 const webBuild=await fs.readFile(path.join(root,'scripts','build-web.mjs'),'utf8');
 const capacitor=await fs.readFile(path.join(root,'capacitor.config.json'),'utf8');
 if(!browserBuild.includes('build-web.mjs')||!browserBuild.includes('mobile-create.js')||!webBuild.includes('mobile-create.js')||!capacitor.includes('"webDir": "dist"'))throw Error('Cap and browser are not sharing the Core 5 web payload.');
+const pkg=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
+if(pkg.scripts['native:mac']||pkg.scripts['native:macos']||pkg.scripts.electron)throw Error('Do not invent a Mac Cap target.');
 const channels=await fs.readFile(path.join(root,'docs','RELEASE-CHANNELS.md'),'utf8');
-for(const marker of ['InfectedVoices-Windows','InfectedVoices-Android','InfectedVoices-iOS','No `InfectedVoices-Mac` repo','not finished'])if(!channels.includes(marker))throw Error('Release channels doc is missing '+marker);
+for(const marker of ['InfectedVoices-Windows','EAS','No `InfectedVoices-Mac` repo','not finished','/voices/'])if(!channels.includes(marker))throw Error('Release channels doc is missing '+marker);
 if(!pages['mac.html'].includes('No Mac .app')||!pages['mac.html'].includes('44.1 kHz · 16-bit')||!pages['mac.html'].includes('48 kHz · 24-bit'))throw Error('Mac page is missing Create delivery honesty.');
 const server=await fs.readFile(path.join(root,'scripts','redx-browser-server.mjs'),'utf8');
 if(!server.includes('pathname==="/get"')||!server.includes('pathname==="/download"'))throw Error('/get is not the same page as /download.');

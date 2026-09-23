@@ -2,7 +2,7 @@ import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
 const FILES = ['index.html', 'windows.html', 'mac.html', 'ios.html', 'android.html', 'web.html', 'get.css', 'get.js'];
-const WINDOWS_FALLBACK = 'https://github.com/grimvirusoffical-source/InfectedVoices/releases';
+const WINDOWS_FALLBACK = 'https://github.com/grimvirusoffical-source/InfectedVoices-Windows/releases';
 const APP_FALLBACK = 'https://apps.apple.com/';
 const PLAY_FALLBACK = 'https://play.google.com/store';
 const WEB_FALLBACK = '/voices/';
@@ -69,7 +69,7 @@ export function isWindowsRelease(url) {
   const parsedUrl = parsed(url);
   if (!parsedUrl || parsedUrl.protocol !== 'https:') return false;
   const host = parsedUrl.hostname.toLowerCase();
-  if (host === 'github.com') return /^\/grimvirusoffical-source\/InfectedVoices\/releases(?:\/|$)/i.test(parsedUrl.pathname);
+  if (host === 'github.com') return /^\/grimvirusoffical-source\/InfectedVoices-Windows\/releases(?:\/|$)/i.test(parsedUrl.pathname);
   if (host === 'release-assets.githubusercontent.com') return true;
   if (host === 'app.infectedvoices.space' || host === 'infectedvoices.space') {
     return /^\/(?:releases|download|static)\//i.test(parsedUrl.pathname);
@@ -147,10 +147,10 @@ export function assertDownloadPages(pages, env = {}) {
     if (!isPlayStore(href)) throw new Error('Android page has a non-Play download: ' + href);
   }
   if (!mac.includes('No Mac .app') || !hub.includes('No Mac .app')) throw new Error('Mac must stay honest: no .app is published.');
+  if (hub.includes('data-platform="mac"')) throw new Error('Mac is Open web, not its own install card.');
   for (const href of hrefs(mac)) {
-    if (chrome(href) || isAppleStore(href)) continue;
-    if (/\.(dmg|pkg|app)(?:$|[?#])/i.test(href)) throw new Error('Mac page hosts a desktop installer: ' + href);
-    throw new Error('Mac page has a download that is not Open web or the App Store: ' + href);
+    if (chrome(href)) continue;
+    throw new Error('Mac page must stay on Open web: ' + href);
   }
   if (!windows.includes('id="windowsSha256"') || !windows.includes('SHA-256') || !hub.includes('id="windowsSha256"') || !hub.includes('SHA-256')) {
     throw new Error('Windows SHA-256 is not shown on /get.');
