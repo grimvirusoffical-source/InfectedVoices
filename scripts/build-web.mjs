@@ -42,11 +42,12 @@ lab=lab.replace('content="#100d17"','content="#09090B"').replace('</head>','  <l
 await fs.writeFile(path.join(out,'lab','index.html'),lab);
 await fs.rm(path.join(out,'sw.js'),{force:true});
 await fs.rm(path.join(out,'manifest.webmanifest'),{force:true});
-for(const html of ['studio.html','lab/index.html']){const p=path.join(out,html),t=await fs.readFile(p,'utf8');if(/serviceWorker\.register|src=['"]\.\/?entry\.js/.test(t))throw Error('Native build still contains a web bootstrap/update path: '+html);}
+for(const html of ['studio.html','lab/index.html']){const p=path.join(out,html),t=await fs.readFile(p,'utf8');if(/serviceWorker\.register|src=['"]\.?\/?entry\.js/.test(t))throw Error('Native build still contains a web bootstrap/update path: '+html);}
 const studioDir=path.join(root,'studio');
 const vocalOut=path.join(root,'.vocal-lab');
 const npmBin=process.platform==='win32'?'npm.cmd':'npm';
 execFileSync(npmBin,['install','--include=dev','--ignore-scripts','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+execFileSync(process.execPath,['scripts/assemble-studio-app.mjs'],{cwd:root,stdio:'inherit'});
 execFileSync(npmBin,['run','build:cap','--prefix',studioDir],{cwd:root,stdio:'inherit'});
 await fs.cp(vocalOut,out,{recursive:true});
 await fs.copyFile(path.join(root,'mobile-src','vocal-bridge.js'),path.join(out,'vocal-bridge.js'));
