@@ -1,47 +1,214 @@
-            onSelectPlan={(plan) => {
-              if (plan === 'free') {
-                applyEntitlementSignal({})
-                setStatus('Plan set to Free.')
-                return
-              }
-              applyEntitlementSignal({ studioPlan: plan, billingStatus: 'active' })
-              setStatus(`Plan set to ${plan}.`)
-            }}
-            onStartTrial={startUiTrial}
-          />
-        )}
-
-        {tab === 'mobile' && (
-          <section className="panel">
-            <h2>Phone / Tablet / PC</h2>
-            <p>Same Wi‑Fi LAN URL (not just localhost):</p>
-            <div className="lan-card">
-              <code>{lanUrl}</code>
-              {lanUrl && (
-                <div className="qr-wrap">
-                  <QRCodeSVG value={lanUrl} size={168} bgColor="transparent" fgColor="currentColor" />
-                </div>
-              )}
-            </div>
-            <p className="muted">
-              Run <code>npm run dev -- --host</code>, scan the QR from iPhone/Android/tablet, allow mic. No App Store build required.
+              Arm the mic, then record. Metronome stays cue-only — never lands in the bounce.
             </p>
-            <button
-              className="primary"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(lanUrl)
-                  setStatus('LAN URL copied')
-                } catch {
-                  setStatus(lanUrl)
-                }
-              }}
-            >
-              Copy LAN URL
-            </button>
+            <div className="cta-row">
+              {!engineOn ? (
+                <button className="primary" onClick={startEngine}>
+                  Start engine
+                </button>
+              ) : (
+                <button className="danger" onClick={stopEngine}>
+                  Stop engine
+                </button>
+              )}
+              <button
+                className={recording ? 'rec-live' : engineOn ? 'primary' : ''}
+                disabled={!engineOn}
+                onClick={toggleRecord}
+              >
+                {recording ? 'Stop take' : 'Record take'}
+              </button>
+              <button
+                disabled={!engineOn}
+                onClick={() => {
+                  toggleMetro(!metro)
+                }}
+              >
+                Metronome (cue only)
+              </button>
+            </div>
           </section>
         )}
-      </main>
-    </div>
-  )
-}
+
+        {tab === 'beat' && (
+          <section className="panel">
+            <h2>Beat Deck</h2>
+            <div className="grid2">
+              <label className="field">
+                Import beat
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) void onBeatFile(f)
+                  }}
+                />
+              </label>
+              <label className="field">
+                BPM
+                <input
+                  type="number"
+                  value={bpm}
+                  min={60}
+                  max={200}
+                  onChange={(e) => {
+                    const v = Number(e.target.value)
+                    setBpm(v)
+                    engineRef.current?.setBpm(v)
+                    void saveProject({ bpm: v })
+                  }}
+                />
+              </label>
+            </div>
+            <div className="row" style={{ marginTop: 12 }}>
+              <button
+                className="primary"
+                onClick={() => {
+                  engineRef.current?.play()
+                  setStatus('Transport playing')
+                }}
+              >
+                Play
+              </button>
+              <button onClick={() => engineRef.current?.pause()}>Pause</button>
+              <button onClick={() => engineRef.current?.stop()}>Stop</button>
+              <span className="muted">{beatName ?? 'No beat loaded'} · {pos.toFixed(2)}s</span>
+            </div>
+            {waveformPeaks.length > 0 && (
+              <div className="waveform" aria-hidden>
+                {waveformPeaks.map((v, i) => (
+                  <span key={i} style={{ height: `${Math.max(4, v * 100)}%` }} />
+                ))}
+                <div
+                  className="loop-playhead"
+                  style={{
+                    left: `${Math.min(100, Math.max(0, (pos / Math.max(beatBuf?.duration ?? 1, 0.001)) * 100))}%`,
+                  }}
+                />
+              </div>
+            )}
+          </section>
+        )}
+
+        {tab === 'voice' && (
+          <>
+            <section className="panel">
+              <h2>Mode</h2>
+              <div className="mode-seg">
+                {(['rap', 'sing', 'call'] as const).map((m) => (
+                  <button
+                    key={m}
+                    className={settings.mode === m ? 'active' : ''}
+                    onClick={() => patchSettings({ mode: m, acapella: m === 'sing' ? settings.acapella : false })}
+                  >
+                    {m === 'rap' ? 'Rap' : m === 'sing' ? 'Singing' : 'Call'}
+                  </button>
+                ))}
+              </div>
+              {settings.mode === 'sing' && (
+                <div className="row" style={{ marginTop: 12 }}>
+                  <button
+                    className={settings.acapella ? 'primary' : ''}
+                    onClick={() => patchSettings({ acapella: !settings.acapella })}
+                  >
+                    Acapella space
+                  </button>
+                </div>
+              )}
+            </section>
+            <section className="panel">
+              <h2>Presets</h2>
+              <div className="preset-grid">
+                {presets.map((p) => (
+                  <button
+                    key={p.id}
+                    className={activePresetId === p.id ? 'primary' : ''}
+                    onClick={() => loadPreset(p)}
+                  >
+                    {p.name}
+                    {p.factory ? '' : ' ★'}
+                  </button>
+                ))}
+              </div>
+              <div className="row" style={{ marginTop: 12 }}>
+                <input
+                  type="text"
+                  placeholder="Custom preset name"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  style={{ maxWidth: 240 }}
+                />
+                <button className="primary" onClick={saveCustom}>
+                  Save custom
+                </button>
+                {!presets.find((p) => p.id === activePresetId)?.factory && (
+                  <button
+                    className="danger"
+                    onClick={async () => {
+                      await deletePreset(activePresetId)
+                      setPresets(await listPresets())
+                      loadPreset(factoryPresets()[0])
+                    }}
+                  >
+                    Delete custom
+                  </button>
+                )}
+              </div>
+              <p className="muted" style={{ marginTop: 10 }}>
+                GRIM Signature is deeper and darker than 0.3.0 — depth, grit, darkness, and low formant bias cranked for that evil tone.
+              </p>
+            </section>
+          </>
+        )}
+
+        {tab === 'settings' && (
+          <section className="panel">
+            <h2>Deep Settings</h2>
+            <div className="grid2" style={{ marginBottom: 12 }}>
+              <label className="field">
+                Key
+                <select
+                  value={settings.key}
+                  onChange={(e) => patchSettings({ key: e.target.value })}
+                >
+                  {KEYS.map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                Scale
+                <select
+                  value={settings.scale}
+                  onChange={(e) =>
+                    patchSettings({ scale: e.target.value as VocalSettings['scale'] })
+                  }
+                >
+                  <option value="naturalMinor">Natural minor</option>
+                  <option value="harmonicMinor">Harmonic minor</option>
+                  <option value="major">Major</option>
+                  <option value="pentatonicMinor">Pentatonic minor</option>
+                  <option value="chromatic">Chromatic</option>
+                </select>
+              </label>
+            </div>
+            <div className="row" style={{ marginBottom: 12 }}>
+              <button
+                className={settings.grimOn ? 'primary' : ''}
+                onClick={() => {
+                  if (!settings.grimOn && isFeatureLocked('advanced', entitlements)) {
+                    setStatus('GRIM is included in Basic $20.')
+                    showPlan()
+                    return
+                  }
+                  patchSettings({ grimOn: !settings.grimOn })
+                }}
+              >
+                GRIM {settings.grimOn ? 'ON' : 'OFF'}
+              </button>
+              <button onClick={() => patchSettings(defaultSettings())}>Reset clean</button>
+            </div>
+            <div className="settings-group">
+              <h3>Pitch</h3>
