@@ -1,0 +1,23 @@
+✔ continuous pitch chooses the nearest permitted note rather than a rounded pitch class (0.8655ms)
+✔ pitch snapping handles octave boundaries and rejects non-finite input (0.1721ms)
+✔ YIN rejects silent, DC, corrupt and undersized frames (1.0743ms)
+✔ YIN accuracy at 22050 Hz (17.5665ms)
+✔ YIN accuracy at 44100 Hz (13.0281ms)
+✔ YIN accuracy at 48000 Hz (9.9195ms)
+✔ YIN accuracy at 96000 Hz (17.2768ms)
+✔ all correction blend sites permit zero and reject non-finite controls (0.5904ms)
+✔ offline processing preserves partial tails and dry takes; workers have cleanup guards (0.5101ms)
+✔ scale snap holds a concert A in A major (1.9366ms)
+✔ scale snap pulls A# toward the A major collection (0.4472ms)
+✔ pocket assist stays inside ±80 ms (1.707ms)
+✔ A–B key estimate hears a concert A (4.6901ms)
+✔ published v0.4.0 artifact is the Release source zipball (1.832ms)
+✔ project lab bar loop is 4/4 at the session bpm (0.9182ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 201.4396

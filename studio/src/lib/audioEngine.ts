@@ -169,7 +169,7 @@ export class InfectedAudioEngine {
     const delta = this.targetPitch - this.currentPitch
     this.currentPitch += Math.max(-maxStep, Math.min(maxStep, delta))
     this.correct.setPitch(this.currentPitch)
-    this.correct.setMix(Math.max(0.05, Math.min(1, s.correction / 100)))
+    this.correct.setMix(Math.max(0, Math.min(1, Number.isFinite(s.correction) ? s.correction / 100 : 0)))
 
     if (this.grimShift) {
       if (s.grimOn) {
@@ -219,7 +219,7 @@ export class InfectedAudioEngine {
     const outLin = Math.pow(10, s.outputDb / 20)
     this.masterOut!.gain.rampTo(outLin, 0.05)
     this.wetGain!.gain.rampTo(1, 0.05)
-    if (this.correct) this.correct.setMix(Math.max(0.05, Math.min(1, s.correction / 100)))
+    if (this.correct) this.correct.setMix(Math.max(0, Math.min(1, Number.isFinite(s.correction) ? s.correction / 100 : 0)))
   }
 
   /** Rap-on-beat: Bungee time-stretch (pitch-preserving), not playbackRate */
@@ -259,7 +259,7 @@ export class InfectedAudioEngine {
       loop: false,
       onload: () => undefined,
     }).connect(this.beatGain!)
-    await Tone.loaded()
+    try { await Tone.loaded() } finally { URL.revokeObjectURL(url) }
   }
 
   setBeatVolume(v: number) {
@@ -333,29 +333,31 @@ export class InfectedAudioEngine {
     const ch0 = audioBuffer.getChannelData(0)
     const frame = Math.floor(sr * 0.12) // ~120ms windows
     const hop = frame
-    const mix = Math.max(0.1, Math.min(1, s.correction / 100))
+    const mix = Math.max(0, Math.min(1, Number.isFinite(s.correction) ? s.correction / 100 : 0))
     const grim = s.grimOn ? -(s.depth / 100) * 7 : 0
     const formant = (s.formant / 100) * 2
     const parts: AudioBuffer[] = []
 
-    for (let i = 0; i < ch0.length; i += hop) {
-      const len = Math.min(frame, ch0.length - i)
-      if (len < 256) break
-      const slice = new AudioBuffer({
-        length: len,
-        numberOfChannels: audioBuffer.numberOfChannels,
-        sampleRate: sr,
-      })
-      for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
-        slice.getChannelData(c).set(audioBuffer.getChannelData(c).subarray(i, i + len))
+    try {
+      for (let i = 0; i < ch0.length; i += hop) {
+        const len = Math.min(frame, ch0.length - i)
+        const slice = new AudioBuffer({
+          length: len,
+          numberOfChannels: audioBuffer.numberOfChannels,
+          sampleRate: sr,
+        })
+        for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+          slice.getChannelData(c).set(audioBuffer.getChannelData(c).subarray(i, i + len))
+        }
+        // Preserve very short takes and the final partial frame instead of dropping them.
+        if (len < 256 || mix === 0) { parts.push(slice); continue }
+        const hz = yinDetect(slice.getChannelData(0), sr)
+        const snap = snapSemitones(hz, s.key, s.scale, 8)
+        const pitch = (snap ?? 0) + grim * 0.4 + formant
+        const shifted = await offline.process(slice, { pitch, speed: 1, mix })
+        parts.push(shifted)
       }
-      const hz = yinDetect(slice.getChannelData(0), sr)
-      const snap = snapSemitones(hz, s.key, s.scale, 8)
-      const pitch = (snap ?? 0) + grim * 0.4 + formant
-      const shifted = await offline.process(slice, { pitch, speed: 1, mix })
-      parts.push(shifted)
-    }
-    offline.dispose?.()
+    } finally { offline.dispose?.() }
 
     const total = parts.reduce((n, b) => n + b.length, 0) || audioBuffer.length
     const channels = audioBuffer.numberOfChannels
@@ -419,9 +421,8 @@ export class InfectedAudioEngine {
       workerPath: publicAsset('audio-processor.worker.bundle.js'),
       workletPath: publicAsset('bungee-processor-bundled.js'),
     })
-    const out = await offline.process(audioBuffer, { pitch: 0, speed, mix: 1 })
-    offline.dispose?.()
-    return out
+    try { return await offline.process(audioBuffer, { pitch: 0, speed, mix: 1 }) }
+    finally { offline.dispose?.() }
   }
 }
 
