@@ -14,7 +14,7 @@ A signed-in account is **Free**. `allowed`, lifetime, member, studio, or a badge
 | Basic ($20) | Those six tools. Default export is **48 kHz / 24-bit**. One 7-day trial per account (`basicTrialUsedAt`) |
 | Pro ($40) | Everything in Basic, plus stems, AI mix/master, AI auto-tune, AI beat-lock, and vocal isolation. One 7-day trial (`proTrialUsedAt`). A verified Studio Plus receipt (`infectedvoices.studio.monthly`) maps to **Pro** |
 
-Cloud AI stays a real `503` with `provider_not_configured`. The app does not invent a bounce. `/get` and `/download` are the same page: App Store and Google Play only (no ipa, no aab), Windows signed with SHA-256 beside the installer, open web goes to `/voices`, and there is no Mac `.app`. The GitHub zipball is source, not the Windows installer.
+Cloud AI stays a real `503` with `provider_not_configured`. The app does not invent a bounce. `/get` and `/download` are the same page: App Store and Google Play only (no ipa, no aab), Windows installer from Releases when available (no signature claim and no checksum until an Authenticode Release exists), open web goes to `/voices`, and there is no Mac `.app`. The GitHub zipball is source, not the Windows installer.
 
 ## Already in the Capacitor app
 
