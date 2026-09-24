@@ -55,14 +55,14 @@ test('P0 hooks: trialEligible flip hides Basic CTA after card-auth trial start',
   assert.equal(ui.testIds.trialCtaBasic, null)
 })
 
-test('P0 hooks: card-upfront without auth does not unlock; Basic CTA gone', () => {
+test('P0 hooks: card-upfront without auth does not unlock; trial CTA stays', () => {
   const before = buildEntitlements({})
   const endsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
   const after = markTrialStarted(before, 'pro', endsAt, { cardAuthorized: false })
   const ui = expectedTierUi(after)
   assert.equal(ui.showFeatureLockAdvanced, true)
   assert.equal(ui.showFeatureLockSmartMix, true)
-  assert.equal(ui.showTrialCtaPro, false)
+  assert.equal(ui.showTrialCtaPro, true)
   assert.equal(ui.exportLockedAt16, true)
 })
 

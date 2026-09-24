@@ -49,7 +49,7 @@ test('P0: card-upfront trial without auth does not unlock Basic/Pro', () => {
   const endsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
   const after = markTrialStarted(before, 'pro', endsAt, { cardAuthorized: false })
   assert.equal(after.tier, 'free')
-  assert.equal(after.trialEligible.pro, false)
+  assert.equal(after.trialEligible.pro, true)
   assert.equal(after.features.smartMix, false)
   assert.equal(after.billing.status, 'none')
 })

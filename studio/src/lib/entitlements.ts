@@ -180,18 +180,16 @@ export function readCachedEntitlements(
   return cache.entitlements
 }
 
-/** Card-upfront trial start: flips eligibility immediately; does not unlock without auth. */
+/** Card-upfront trial start: successful auth flips eligibility; card-fail does not burn trial. */
 export function markTrialStarted(
   entitlements: Entitlements,
   tier: 'basic' | 'pro',
   endsAt: string,
   opts: { cardAuthorized?: boolean } = {},
 ): Entitlements {
+  // Card-fail must not burn eligibility (match server 8e53305).
   if (opts.cardAuthorized === false) {
-    return {
-      ...entitlements,
-      trialEligible: { ...entitlements.trialEligible, [tier]: false },
-    }
+    return entitlements
   }
   return {
     ...entitlements,
