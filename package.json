@@ -14,7 +14,8 @@
     "open:android": "npm run sync:android && npx cap open android",
     "build:browser": "node scripts/build-browser.mjs",
     "start:redx": "bun scripts/redx-browser-server.mjs",
-    "test": "bun test studio/src/lib/studioFeatures.test.ts studio/src/lib/entitlements.test.ts studio/src/lib/gates.test.ts"
+    "test": "bun test studio/src/lib/studioFeatures.test.ts studio/src/lib/entitlements.test.ts studio/src/lib/gates.test.ts",
+    "prebuild:studio-app": "node scripts/assemble-studio-app.mjs"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.0",
