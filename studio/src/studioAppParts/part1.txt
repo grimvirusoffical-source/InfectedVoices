@@ -1,1 +1,226 @@
-PLACEHOLDER_SHOULD_NOT_STAY
+      const loaded = proj.settings.grimOn && isFeatureLocked('advanced', bootEntitlements) ? { ...proj.settings, grimOn: false } : proj.settings
+      setSettings(loaded)
+      if (location.hash === '#lab') setTab('lab')
+      setBpm(proj.bpm)
+      setLoopStart(proj.loopStartSec)
+      setLoopEnd(proj.loopEndSec)
+      setLoopStartBar(secToBar(proj.loopStartSec, proj.bpm))
+      setLoopEndBar(Math.max(secToBar(proj.loopStartSec, proj.bpm), secToBar(Math.max(0, proj.loopEndSec - 0.0001), proj.bpm)))
+      setSections(proj.sections ?? [])
+      const savedMode = localStorage.getItem('iv-ui-mode')
+      if (savedMode === 'ios' || savedMode === 'android' || savedMode === 'pc' || savedMode === 'auto') setUiMode(savedMode)
+      const savedKey = localStorage.getItem('iv-roex-key')
+      if (savedKey) setRoexKey(savedKey)
+      setTakes(await listTakes())
+      const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80')
+      const proto = window.location.protocol
+      const urls = new Set<string>([window.location.origin])
+      try {
+        const pcs = [new RTCPeerConnection({ iceServers: [] })]
+        pcs[0].createDataChannel('')
+        const offer = await pcs[0].createOffer()
+        await pcs[0].setLocalDescription(offer)
+        await new Promise<void>((resolve) => {
+          const done = () => resolve()
+          setTimeout(done, 800)
+          pcs[0].onicecandidate = (e) => {
+            const cand = e.candidate?.candidate
+            if (!cand) return
+            const m = /([0-9]{1,3}(?:\.[0-9]{1,3}){3})/.exec(cand)
+            if (m && !m[1].startsWith('127.')) {
+              urls.add(`${proto}//${m[1]}:${port}`)
+            }
+            if (!e.candidate) done()
+          }
+        })
+        pcs[0].close()
+      } catch {
+        /* keep origin */
+      }
+      const preferred = [...urls].find((u) => !u.includes('localhost') && !u.includes('127.0.0.1')) || window.location.origin
+      setLanUrl(preferred)
+    })()
+  }, [])
+
+  useEffect(() => {
+    let cancel = false
+    ;(async () => {
+      const mod = await loadHostSession()
+      if (cancel) return
+      setHost(mod)
+      if (mod) {
+        try {
+          setUser(await mod.auth.getUser())
+        } catch (error) {
+          setHostError(error instanceof Error ? error.message : String(error))
+          setUser(null)
+        }
+      }
+      if (!cancel) setHostReady(true)
+    })()
+    return () => {
+      cancel = true
+    }
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.dataset.ui = uiMode
+    localStorage.setItem('iv-ui-mode', uiMode)
+  }, [uiMode])
+
+  const bindTick = useCallback((engine: InfectedAudioEngine) => {
+    engine.setOnTick((p) => {
+      setPos(p)
+      const section = sectionsRef.current.find((item) => p >= item.startSec && p < item.endSec)
+      const current = settingsRef.current
+      if (!section || (section.key === current.key && section.scale === current.scale)) return
+      const next = { ...current, key: section.key, scale: section.scale }
+      settingsRef.current = next
+      setSettings(next)
+      engine.applySettings(next)
+    })
+  }, [])
+
+  const barBeat = useMemo(() => {
+    const beats = pos / (60 / bpm)
+    const bar = Math.floor(beats / 4) + 1
+    const beat = (Math.floor(beats) % 4) + 1
+    return { bar, beat }
+  }, [pos, bpm])
+
+  const patchSettings = useCallback((partial: Partial<VocalSettings>) => {
+    setSettings((s) => {
+      const next = { ...s, ...partial }
+      engineRef.current?.applySettings(next)
+      void saveProject({ settings: next })
+      return next
+    })
+  }, [])
+
+  const startEngine = async () => {
+    try {
+      setStatus('Starting engine…')
+      if (!engineRef.current) {
+        engineRef.current = new InfectedAudioEngine(settings)
+        await engineRef.current.init()
+        bindTick(engineRef.current)
+      }
+      engineRef.current.setBpm(bpm)
+      engineRef.current.applySettings(settings)
+      await engineRef.current.startMic()
+      setEngineOn(true)
+      setStatus('Engine live — headphones recommended')
+    } catch (e) {
+      setStatus(`Mic error: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  const stopEngine = () => {
+    engineRef.current?.stopMic()
+    engineRef.current?.stop()
+    setEngineOn(false)
+    setStatus('Engine stopped')
+  }
+
+  const onBeatFile = async (file: File) => {
+    const ab = await file.arrayBuffer()
+    const buf = await blobToAudioBuffer(new Blob([ab]))
+    setBeatBuf(buf)
+    const peaks: number[] = []
+    const data = buf.getChannelData(0)
+    const buckets = 120
+    const step = Math.floor(data.length / buckets) || 1
+    for (let i = 0; i < buckets; i++) {
+      let m = 0
+      const start = i * step
+      for (let j = start; j < start + step && j < data.length; j++) m = Math.max(m, Math.abs(data[j]))
+      peaks.push(m)
+    }
+    setWaveformPeaks(peaks)
+    setBeatName(file.name)
+    if (!engineRef.current) {
+      engineRef.current = new InfectedAudioEngine(settings)
+      await engineRef.current.init()
+      bindTick(engineRef.current)
+    }
+    await engineRef.current.loadBeat(ab)
+    engineRef.current.setBpm(bpm)
+    setStatus(`Beat loaded: ${file.name}`)
+  }
+
+  const applyLoop = () => {
+    engineRef.current?.setLoop(loopOn, loopStart, loopEnd)
+    void saveProject({ loopStartSec: loopStart, loopEndSec: loopEnd, bpm })
+  }
+
+  const applyBarLoop = () => {
+    const range = loopRangeFromBars(loopStartBar, loopEndBar, bpm)
+    setLoopStartBar(range.startBar)
+    setLoopEndBar(range.endBar)
+    setLoopStart(range.startSec)
+    setLoopEnd(range.endSec)
+    setLoopOn(true)
+    engineRef.current?.setLoop(true, range.startSec, range.endSec)
+    void saveProject({ loopStartSec: range.startSec, loopEndSec: range.endSec, bpm })
+    setStatus(`Bar loop ${range.startBar}–${range.endBar} (${range.startSec.toFixed(2)}s–${range.endSec.toFixed(2)}s)`)
+  }
+
+  const setOneBarLoop = () => {
+    const startBar = secToBar(pos, bpm)
+    setLoopStartBar(startBar)
+    setLoopEndBar(startBar)
+    const range = loopRangeFromBars(startBar, startBar, bpm)
+    setLoopStart(range.startSec)
+    setLoopEnd(range.endSec)
+    setLoopOn(true)
+    engineRef.current?.setLoop(true, range.startSec, range.endSec)
+    void saveProject({ loopStartSec: range.startSec, loopEndSec: range.endSec, bpm })
+    setStatus(`One-bar loop at bar ${startBar}`)
+  }
+
+  const rememberSection = (guess?: { key: string; scale: VocalSettings['scale'] }) => {
+    const section: SongSection = {
+      id: uid('section'),
+      startSec: loopStart,
+      endSec: Math.max(loopStart + 0.05, loopEnd),
+      key: guess?.key ?? settings.key,
+      scale: guess?.scale ?? settings.scale,
+    }
+    const next = [...sections.filter((item) => item.endSec <= section.startSec || item.startSec >= section.endSec), section]
+      .sort((a, b) => a.startSec - b.startSec)
+    setSections(next)
+    void saveProject({ sections: next })
+    setStatus(`Song map ${section.key} ${section.scale} · ${section.startSec.toFixed(2)}s–${section.endSec.toFixed(2)}s`)
+  }
+
+  const estimateSectionKey = () => {
+    if (!beatBuf) {
+      setStatus('Import a beat before estimating a section key')
+      return
+    }
+    const slice = sliceChannel(beatBuf, loopStart, loopEnd)
+    const guess = estimateKey(slice, beatBuf.sampleRate)
+    if (!guess) {
+      setStatus('Could not estimate a key in A–B. Set it by ear.')
+      return
+    }
+    rememberSection(guess)
+  }
+
+  const toggleMetro = (on: boolean) => {
+    setMetro(on)
+    engineRef.current?.setMetronome(on)
+  }
+
+  const toggleRecord = async () => {
+    if (!engineRef.current) return
+    if (!recording) {
+      await engineRef.current.startRecording()
+      setRecording(true)
+      setStatus('Recording take… (metronome stays cue-only)')
+    } else {
+      const blob = await engineRef.current.stopRecording()
+      setRecording(false)
+      const take = await persistAsWavTake({
+        name: `Take ${new Date().toLocaleTimeString()}`,
+        blob,
