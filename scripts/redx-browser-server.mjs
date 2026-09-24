@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { applyStripeSubscription, emptyBilling } from "./stripe-subscription.mjs";
+import { entitlementsFromBilling, startTrialOnBilling } from "./entitlements.mjs";
 import { DOWNLOAD_ROUTES, renderDownload } from "./download-pages.mjs";
 import { mkdirSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
@@ -125,7 +126,27 @@ async function api(req,url){
   }
   if(path==="/api/me"&&req.method==="GET"){
     const found=await accountFor(req);
-    return json(req,{user:found.account?user(found.account):null,csrf:""});
+    const entitlements=found.account?entitlementsFromBilling(readBilling(found.account.accountId),Date.now()):null;
+    return json(req,{user:found.account?user(found.account):null,entitlements,csrf:""});
+  }
+
+  if(path==="/api/me/entitlements"&&req.method==="GET"){
+    const found=await requireAccount(req);if("error" in found)return found.error;
+    const billing=readBilling(found.account.accountId);
+    return json(req,entitlementsFromBilling(billing,Date.now()));
+  }
+  if(path==="/api/billing/trial"&&req.method==="POST"){
+    const found=await requireAccount(req);if("error" in found)return found.error;
+    const body=await parseBody(req);
+    const tier=body.tier==="pro"?"pro":"basic";
+    const stored=readBilling(found.account.accountId);
+    const result=startTrialOnBilling(stored,tier,{
+      cardAuthorized:body.cardAuthorized!==false,
+      trialDays:Number(process.env.IV_STRIPE_TRIAL_DAYS||7)
+    },Date.now());
+    writeBilling(found.account.accountId,result.record);
+    if(!result.ok)return json(req,{error:result.reason,entitlements:entitlementsFromBilling(result.record)},result.status);
+    return json(req,{ok:true,entitlements:entitlementsFromBilling(result.record)});
   }
   if(path==="/api/logout"&&req.method==="POST"){
     const token=bearer(req);
