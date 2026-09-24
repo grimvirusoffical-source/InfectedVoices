@@ -1,0 +1,22 @@
+.feature-lock {
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 10px 0 14px;
+  background: color-mix(in srgb, var(--surface-raised, #161622) 92%, #4f46e5 8%);
+}
+.feature-lock-inner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.feature-lock-icon {
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+.password-hint {
+  margin: 6px 0 0;
+}
+.subscribe-panel .trial-ctas {
+  margin-top: 12px;
+}
