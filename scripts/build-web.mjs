@@ -45,9 +45,11 @@ await fs.rm(path.join(out,'manifest.webmanifest'),{force:true});
 for(const html of ['studio.html','lab/index.html']){const p=path.join(out,html),t=await fs.readFile(p,'utf8');if(/serviceWorker\.register|src=['"]\.\/?entry\.js/.test(t))throw Error('Native build still contains a web bootstrap/update path: '+html);}
 const studioDir=path.join(root,'studio');
 const vocalOut=path.join(root,'.vocal-lab');
-const npmBin=process.platform==='win32'?'npm.cmd':'npm';
-execFileSync(npmBin,['install','--include=dev','--ignore-scripts','--prefix',studioDir],{cwd:root,stdio:'inherit'});
-execFileSync(npmBin,['run','build:cap','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+const npmCli=process.env.npm_execpath;
+if(!npmCli)throw Error('Start this build through npm run so the installed npm CLI can be resolved.');
+execFileSync(process.execPath,[npmCli,'ci','--include=dev','--ignore-scripts','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+execFileSync(process.execPath,[path.join(studioDir,'scripts','copy-worklets.mjs')],{cwd:studioDir,stdio:'inherit'});
+execFileSync(process.execPath,[npmCli,'run','build:cap','--prefix',studioDir],{cwd:root,stdio:'inherit'});
 await fs.cp(vocalOut,out,{recursive:true});
 await fs.copyFile(path.join(root,'mobile-src','vocal-bridge.js'),path.join(out,'vocal-bridge.js'));
 let vocalIndex=await fs.readFile(path.join(out,'index.html'),'utf8');

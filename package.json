@@ -14,7 +14,7 @@
     "open:android": "npm run sync:android && npx cap open android",
     "build:browser": "node scripts/build-browser.mjs",
     "start:redx": "bun scripts/redx-browser-server.mjs",
-    "test": "node --experimental-strip-types --test studio/src/lib/studioFeatures.test.ts"
+    "test": "node --experimental-strip-types --test studio/src/lib/*.test.ts"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.0",
