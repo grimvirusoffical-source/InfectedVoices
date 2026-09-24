@@ -1,0 +1,161 @@
+              <div className="knobs">
+                <Knob label="Correction" value={settings.correction} onChange={(v) => patchSettings({ correction: v })} />
+                <Knob label="Retune ms" value={settings.retuneMs} min={1} max={40} onChange={(v) => patchSettings({ retuneMs: v })} />
+                <Knob label="Humanize" value={settings.humanize} onChange={(v) => patchSettings({ humanize: v })} />
+                <Knob label="Formant" value={settings.formant} min={-50} max={50} onChange={(v) => patchSettings({ formant: v })} />
+              </div>
+            </div>
+            <div className="settings-group">
+              <h3>Tone (GRIM)</h3>
+              <div className="knobs">
+                <Knob label="Depth (evil)" value={settings.depth} onChange={(v) => patchSettings({ depth: v })} />
+                <Knob label="Glitch" value={settings.glitch} onChange={(v) => patchSettings({ glitch: v })} />
+                <Knob label="Grit" value={settings.grit} onChange={(v) => patchSettings({ grit: v })} />
+                <Knob label="Darkness" value={settings.darkness} onChange={(v) => patchSettings({ darkness: v })} />
+                <Knob label="Warmth" value={settings.warmth} onChange={(v) => patchSettings({ warmth: v })} />
+              </div>
+            </div>
+            <div className="settings-group">
+              <h3>Space</h3>
+              <div className="knobs">
+                <Knob label="Echo" value={settings.echo} onChange={(v) => patchSettings({ echo: v })} />
+                <Knob label="Space" value={settings.space} onChange={(v) => patchSettings({ space: v })} />
+              </div>
+            </div>
+            <div className="settings-group">
+              <h3>Dynamics</h3>
+              <div className="knobs">
+                <Knob label="Gate" value={settings.gate} onChange={(v) => patchSettings({ gate: v })} />
+                <Knob label="Compress" value={settings.compress} onChange={(v) => patchSettings({ compress: v })} />
+                <Knob label="De-ess" value={settings.deess} onChange={(v) => patchSettings({ deess: v })} />
+                <Knob label="Output dB" value={settings.outputDb} min={-12} max={0} onChange={(v) => patchSettings({ outputDb: v })} />
+              </div>
+            </div>
+          </section>
+        )}
+
+        {tab === 'practice' && (
+          <section className="panel">
+            <h2>Rap on Beat · Practice Loop</h2>
+            <div className="grid3">
+              <label className="field">
+                Loop start (sec)
+                <input
+                  type="number"
+                  step={0.01}
+                  value={loopStart}
+                  onChange={(e) => setLoopStart(Number(e.target.value))}
+                />
+              </label>
+              <label className="field">
+                Loop end (sec)
+                <input
+                  type="number"
+                  step={0.01}
+                  value={loopEnd}
+                  onChange={(e) => setLoopEnd(Number(e.target.value))}
+                />
+              </label>
+              <label className="field">
+                Playhead
+                <div className="row">
+                  <button onClick={() => setLoopStart(pos)}>Set start here</button>
+                  <button onClick={() => setLoopEnd(pos)}>Set end here</button>
+                </div>
+              </label>
+            </div>
+            <div className="loop-rail">
+              <div className="loop-track">
+                <div
+                  className="loop-region"
+                  style={{
+                    left: `${Math.min(95, Math.max(0, (loopStart / Math.max(loopEnd, loopStart + 0.01, 30)) * 100))}%`,
+                    width: `${Math.min(100, Math.max(2, ((loopEnd - loopStart) / Math.max(loopEnd, 30)) * 100))}%`,
+                  }}
+                />
+                <div
+                  className="loop-playhead"
+                  style={{
+                    left: `${Math.min(100, Math.max(0, (pos / Math.max(loopEnd, beatBuf?.duration ?? 30, 1)) * 100))}%`,
+                  }}
+                />
+              </div>
+              <div className="loop-meta">
+                <span>
+                  Loop {loopStart.toFixed(2)}s – {loopEnd.toFixed(2)}s
+                </span>
+                <span>Playhead {pos.toFixed(2)}s · rate {rapRate.toFixed(3)}×</span>
+              </div>
+            </div>
+            <div className="cta-row" style={{ marginTop: 12 }}>
+              <button
+                className={loopOn ? 'primary' : ''}
+                onClick={() => {
+                  const next = !loopOn
+                  setLoopOn(next)
+                  engineRef.current?.setLoop(next, loopStart, loopEnd)
+                  applyLoop()
+                }}
+              >
+                {loopOn ? 'Loop ON' : 'Loop OFF'}
+              </button>
+              <button onClick={applyLoop}>Apply loop points</button>
+              <button onClick={setOneBarLoop}>One-bar loop at cursor</button>
+              <button onClick={() => toggleMetro(!metro)}>Metronome cue</button>
+              <button className={recording ? 'rec-live' : 'primary'} onClick={savePracticePass}>
+                {recording ? 'Save pass to project' : 'Record practice pass'}
+              </button>
+              <button onClick={() => void applyRapOnBeat()}>Rap on Beat auto</button>
+            </div>
+            <div className="settings-group">
+              <h3>Recording compensation</h3>
+              <label className="field">
+                Milliseconds <strong style={{ color: 'var(--text-primary)' }}>{compensationMs}</strong>
+                <input
+                  type="range"
+                  min={-200}
+                  max={200}
+                  value={compensationMs}
+                  onChange={(e) => setCompensationMs(Number(e.target.value))}
+                />
+              </label>
+              <p className="muted">Positive compensation moves the recorded vocal earlier. Headphones keep the cue metronome out of the take.</p>
+            </div>
+            <div className="settings-group">
+              <h3>Follow the beat</h3>
+              <p className="muted">Save the current A–B range onto the song map. Playback, recording and offline autotune follow that key. Estimates need an ear check.</p>
+              <div className="cta-row">
+                <button onClick={() => rememberSection()}>Use current key for A–B</button>
+                <button onClick={estimateSectionKey}>Estimate key in A–B</button>
+              </div>
+              {sections.map((section) => (
+                <div className="take" key={section.id}>
+                  <div>
+                    <strong>{section.key} · {section.scale}</strong>
+                    <div className="muted">{section.startSec.toFixed(2)}s – {section.endSec.toFixed(2)}s</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const next = sections.filter((item) => item.id !== section.id)
+                      setSections(next)
+                      void saveProject({ sections: next })
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="muted" style={{ marginTop: 10 }}>
+              Loop a section, spit the bar until it locks, then save the pass.
+            </p>
+          </section>
+        )}
+
+        {tab === 'lab' && isFeatureLocked('advanced', entitlements) && (
+          <section className="panel">
+            <h2>Project Lab</h2>
+            <p className="panel-lead">Project Lab is included in Basic $20. Free export is 44.1 kHz · 16-bit WAV with a delivery note. Basic and Pro Smart Mix defaults to 48 kHz / 24-bit WAV.</p>
+            <FeatureLock
+              id="advanced"
+              title="Advanced editor locked"
