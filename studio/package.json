@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:host": "tsc -b && vite build --outDir ../.browser-studio --emptyOutDir",
-    "build:cap": "tsc -b && vite build --outDir ../.vocal-lab --emptyOutDir",
+    "build": "node ../scripts/assemble-studio-app.mjs && tsc -b && vite build",
+    "build:host": "node ../scripts/assemble-studio-app.mjs && tsc -b && vite build --outDir ../.browser-studio --emptyOutDir",
+    "build:cap": "node ../scripts/assemble-studio-app.mjs && tsc -b && vite build --outDir ../.vocal-lab --emptyOutDir",
     "lint": "oxlint",
     "preview": "vite preview",
     "postinstall": "node scripts/copy-worklets.mjs"
