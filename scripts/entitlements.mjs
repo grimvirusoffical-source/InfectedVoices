@@ -99,7 +99,7 @@ export function entitlementsFromBilling(record = {}, now = Date.now()) {
   };
 }
 
-/** Card-upfront trial stub: requires cardAuthorized; flips trialEligible immediately. */
+/** Card-upfront trial stub: requires cardAuthorized; flips trialEligible only on success. */
 export function startTrialOnBilling(record = {}, tier, opts = {}, now = Date.now()) {
   const plan = tier === 'pro' ? 'pro' : 'basic';
   const usedKey = plan === 'pro' ? 'proTrialUsedAt' : 'basicTrialUsedAt';
@@ -108,10 +108,7 @@ export function startTrialOnBilling(record = {}, tier, opts = {}, now = Date.now
       ok: false,
       status: 402,
       reason: 'card_required',
-      record: {
-        ...record,
-        [usedKey]: stamp(record[usedKey]) || now,
-      },
+      record,
     };
   }
   if (stamp(record[usedKey])) {
