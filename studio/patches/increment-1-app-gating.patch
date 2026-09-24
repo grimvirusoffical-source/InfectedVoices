@@ -1,0 +1,324 @@
+--- studio/src/App.tsx
++++ studio/src/App.tsx
+@@ -33,13 +33,26 @@
+ import { deliverBlob } from './lib/deliver'
+ import { clampPocketSec, POCKET_LIMIT_SEC } from './lib/pocket'
+ import { loopRangeFromBars, secToBar } from './lib/transport'
+-import { sessionCan, sessionTier } from './lib/plan'
++import {
++  buildEntitlements,
++  markTrialStarted,
++  type EntitlementSignal,
++} from './lib/entitlements'
++import {
++  canUseAdvancedEditor,
++  canUseSmartMix,
++  exportLimits,
++  isFeatureLocked,
++} from './lib/gates'
++import { useEntitlements } from './hooks/useEntitlements'
++import { ExportBitDepth, FeatureLock, PasswordHint, SubscribePanel } from './components'
+ import { formatDeliveryNote } from './lib/delivery'
+ import { QRCodeSVG } from 'qrcode.react'
+ import { shiftAudioBuffer } from './lib/audioShift'
+ import { STUDIO_VERSION } from './version'
+ import { VOCAL_LAB_V040 } from './releases'
+ import './index.css'
++import './styles/gates.css'
+ 
+ type Tab =
+   | 'studio'
+@@ -49,6 +62,7 @@
+   | 'practice'
+   | 'lab'
+   | 'takes'
++  | 'plan'
+   | 'mobile'
+   | 'desktop'
+   | 'updates'
+@@ -61,6 +75,7 @@
+   { id: 'practice', label: 'Rap on Beat' },
+   { id: 'lab', label: 'Project Lab' },
+   { id: 'takes', label: 'Takes + Export' },
++  { id: 'plan', label: 'Plan' },
+   { id: 'mobile', label: 'Mobile Connect' },
+   { id: 'desktop', label: 'Windows' },
+   { id: 'updates', label: 'Updates' },
+@@ -132,6 +147,41 @@
+   const [hostReady, setHostReady] = useState(false)
+   const [user, setUser] = useState<HostUser | null>(null)
+   const [hostError, setHostError] = useState('')
++  const [entitlementSignal, setEntitlementSignal] = useState<EntitlementSignal>(() => {
++    try {
++      const raw = localStorage.getItem('iv-entitlements-signal')
++      if (raw) return JSON.parse(raw) as EntitlementSignal
++    } catch {
++      /* Free until HTTP stub ready */
++    }
++    return {}
++  })
++  const { entitlements, refresh: refreshEntitlements } = useEntitlements(entitlementSignal)
++  const exportTier = entitlements.tier
++  const showPlan = () => setTab('plan')
++  const applyEntitlementSignal = (next: EntitlementSignal) => {
++    setEntitlementSignal(next)
++    try {
++      localStorage.setItem('iv-entitlements-signal', JSON.stringify(next))
++    } catch {
++      /* ignore */
++    }
++    refreshEntitlements(next)
++  }
++  const startUiTrial = (tier: 'basic' | 'pro') => {
++    const endsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
++    const next = markTrialStarted(entitlements, tier, endsAt, { cardAuthorized: true })
++    applyEntitlementSignal({
++      studioPlan: next.tier,
++      trialPlan: tier,
++      trialEndsAt: endsAt,
++      billingStatus: 'trialing',
++      basicTrialUsedAt: tier === 'basic' || !next.trialEligible.basic ? Date.now() : entitlementSignal.basicTrialUsedAt,
++      proTrialUsedAt: tier === 'pro' || !next.trialEligible.pro ? Date.now() : entitlementSignal.proTrialUsedAt,
++    })
++    setStatus(`Started 7-day ${tier} trial (card-upfront).`)
++    setTab('plan')
++  }
+   const settingsRef = useRef(settings)
+   const sectionsRef = useRef(sections)
+   const undoMaster = useRef<{ settings: VocalSettings; master: MicMasterOptions } | null>(null)
+@@ -178,7 +228,14 @@
+       await seedFactoryPresets()
+       setPresets(await listPresets())
+       const proj = await getProject()
+-      const loaded = proj.settings.grimOn && !sessionCan('grim') ? { ...proj.settings, grimOn: false } : proj.settings
++      let bootEntitlements = buildEntitlements({})
++      try {
++        const rawSignal = localStorage.getItem('iv-entitlements-signal')
++        if (rawSignal) bootEntitlements = buildEntitlements(JSON.parse(rawSignal))
++      } catch {
++        /* Free */
++      }
++      const loaded = proj.settings.grimOn && isFeatureLocked('advanced', bootEntitlements) ? { ...proj.settings, grimOn: false } : proj.settings
+       setSettings(loaded)
+       if (location.hash === '#lab') setTab('lab')
+       setBpm(proj.bpm)
+@@ -412,8 +469,9 @@
+   }
+ 
+   const loadPreset = (p: Preset) => {
+-    if (p.settings.grimOn && !sessionCan('grim')) {
++    if (p.settings.grimOn && isFeatureLocked('advanced', entitlements)) {
+       setStatus('GRIM is included in Basic $20.')
++      showPlan()
+       return
+     }
+     setActivePresetId(p.id)
+@@ -464,7 +522,7 @@
+     const compensationSec = Math.max(-0.2, Math.min(0.2, compensationMs / 1000))
+     if (compensationSec) buf = shiftAudioBuffer(buf, -compensationSec)
+     if (opts.offsetSec) buf = shiftAudioBuffer(buf, opts.offsetSec)
+-    const rendered = await exportMasterWav(buf, sessionTier())
++    const rendered = await exportMasterWav(buf, exportTier)
+     return saveTake({ name: opts.name, blob: rendered.blob, kind: opts.kind, offsetSec: opts.offsetSec })
+   }
+ 
+@@ -476,7 +534,7 @@
+     const buf = await blobToAudioBuffer(file)
+     vocalBufRef.current = buf
+     const processed = await engineRef.current.processOfflineBuffer(buf)
+-    const wav = (await exportMasterWav(processed, sessionTier())).blob
++    const wav = (await exportMasterWav(processed, exportTier)).blob
+     stageBounce(`Tune preview is ready for ${file.name}. Preview, then Keep. Cancel leaves the original file out of the project.`, wav, async () => {
+       await saveTake({ name: `Offline ${file.name}`, blob: wav, kind: 'infected' })
+       setTakes(await listTakes())
+@@ -490,7 +548,7 @@
+     const buf = await blobToAudioBuffer(take.blob)
+     const offset = pocketAssistOffsetSec(buf.getChannelData(0), buf.sampleRate, bpm)
+     const shifted = shiftAudioBuffer(buf, offset)
+-    const wav = (await exportMasterWav(shifted, sessionTier())).blob
++    const wav = (await exportMasterWav(shifted, exportTier)).blob
+     stageBounce(`Timing preview is ready. ${ (offset * 1000).toFixed(1) } ms, inside ±${POCKET_LIMIT_SEC * 1000} ms. Preview, then Keep.`, wav, async () => {
+       await saveTake({
+         name: `${take.name} (pocket ${(offset * 1000).toFixed(0)}ms)`,
+@@ -509,7 +567,7 @@
+     const offset = clampPocketSec(pocketMs / 1000)
+     const buf = await blobToAudioBuffer(take.blob)
+     const shifted = shiftAudioBuffer(buf, offset)
+-    const wav = (await exportMasterWav(shifted, sessionTier())).blob
++    const wav = (await exportMasterWav(shifted, exportTier)).blob
+     stageBounce(`Timing preview is ready. Nudge ${(offset * 1000).toFixed(0)} ms, clamped to ±80 ms. Preview, then Keep.`, wav, async () => {
+       await saveTake({
+         name: `${take.name} (nudge ${(offset * 1000).toFixed(0)}ms)`,
+@@ -523,8 +581,9 @@
+   }
+ 
+   const runSmartMix = async () => {
+-    if (!sessionCan('smart-mix')) {
+-      setStatus('Smart Mix + Master is included in Basic $20.')
++    if (!canUseSmartMix(entitlements)) {
++      setStatus('Smart Mix + Master is included in Pro $40.')
++      showPlan()
+       return
+     }
+     if (!beatBuf) {
+@@ -540,7 +599,7 @@
+     let vocal = await blobToAudioBuffer(vocalTake.blob)
+     if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
+     const mastered = await smartMixMaster(vocal, beatBuf)
+-    const rendered = await exportMasterWav(mastered, sessionTier())
++    const rendered = await exportMasterWav(mastered, exportTier)
+     stageBounce('Mix preview is ready. Vocal balanced, beat ducked, bus limited. Preview, then Keep. This is not an AI master.', rendered.blob, async () => {
+       await saveTake({ name: `SMART MIX+MASTER ${new Date().toLocaleTimeString()}`, blob: rendered.blob, kind: 'master' })
+       setTakes(await listTakes())
+@@ -562,7 +621,7 @@
+     let vocal = await blobToAudioBuffer(vocalTake.blob)
+     if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
+     const mastered = await micMasterMix(vocal, beatBuf)
+-    const wav = (await exportMasterWav(mastered, sessionTier())).blob
++    const wav = (await exportMasterWav(mastered, exportTier)).blob
+     stageBounce('Gentle bus preview is ready. Preview, then Keep. The limiter is not slammed.', wav, async () => {
+       await saveTake({ name: `Mic Master ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
+       setTakes(await listTakes())
+@@ -584,7 +643,7 @@
+     let vocal = await blobToAudioBuffer(vocalTake.blob)
+     if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
+     const mastered = await ultimateMicMaster(vocal, beatBuf, master)
+-    const wav = (await exportMasterWav(mastered, sessionTier())).blob
++    const wav = (await exportMasterWav(mastered, exportTier)).blob
+     stageBounce('Master preview is ready. Preview, then Keep. No finished master is written until Keep.', wav, async () => {
+       await saveTake({ name: `Ultimate Mic Master ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
+       setTakes(await listTakes())
+@@ -633,7 +692,7 @@
+     let buf = await blobToAudioBuffer(take.blob)
+     if (take.offsetSec) buf = shiftAudioBuffer(buf, take.offsetSec)
+     if (format === 'wav') {
+-      const rendered = await exportMasterWav(buf, sessionTier())
++      const rendered = await exportMasterWav(buf, exportTier)
+       const how = await deliverBlob(rendered.blob, `${take.name}.wav`)
+       const verb = how === 'shared' ? 'Shared' : 'Downloaded'
+       setStatus(`${verb} ${take.name}.wav · ${rendered.label}. ${formatDeliveryNote({ metrics: rendered.metrics, sampleRate: rendered.sampleRate, bits: rendered.bits, bpm })}`)
+@@ -660,7 +719,7 @@
+     const speed = rapOnBeatRate(buf.duration, target)
+     setRapRate(speed)
+     const stretched = await engineRef.current.stretchBufferToDuration(buf, target)
+-    const wav = (await exportMasterWav(stretched, sessionTier())).blob
++    const wav = (await exportMasterWav(stretched, exportTier)).blob
+     stageBounce(`Timing preview is ready. Pass stretched to ${target.toFixed(2)} s with pitch kept. Preview, then Keep.`, wav, async () => {
+       await saveTake({
+         name: `${pass.name} (on-beat ${target.toFixed(2)}s)`,
+@@ -690,6 +749,11 @@
+           The recording workspace stays behind the existing account sign-in. A signed-in account is Free until Basic or Pro. The GitHub source zipball is not the Windows installer.
+         </p>
+         {hostError && <p className="error">{hostError}</p>}
++        <label className="field" style={{ maxWidth: 360, margin: '12px auto', textAlign: 'left' }}>
++          Signup password
++          <input type="password" autoComplete="new-password" placeholder="Create a password" readOnly value="" />
++        </label>
++        <PasswordHint />
+         <div className="cta-row">
+           <button
+             className="primary"
+@@ -990,8 +1054,9 @@
+               <button
+                 className={settings.grimOn ? 'primary' : ''}
+                 onClick={() => {
+-                  if (!settings.grimOn && !sessionCan('grim')) {
++                  if (!settings.grimOn && isFeatureLocked('advanced', entitlements)) {
+                     setStatus('GRIM is included in Basic $20.')
++                    showPlan()
+                     return
+                   }
+                   patchSettings({ grimOn: !settings.grimOn })
+@@ -1157,13 +1222,19 @@
+           </section>
+         )}
+ 
+-        {tab === 'lab' && !sessionCan('project-lab') && (
++        {tab === 'lab' && isFeatureLocked('advanced', entitlements) && (
+           <section className="panel">
+             <h2>Project Lab</h2>
+             <p className="panel-lead">Project Lab is included in Basic $20. Free export is 44.1 kHz · 16-bit WAV with a delivery note. Basic and Pro Smart Mix defaults to 48 kHz / 24-bit WAV.</p>
++            <FeatureLock
++              id="advanced"
++              title="Advanced editor locked"
++              message="Upgrade to Basic to open Project Lab, GRIM, and precision tools."
++              onUpgrade={showPlan}
++            />
+           </section>
+         )}
+-        {tab === 'lab' && sessionCan('project-lab') && (
++        {tab === 'lab' && canUseAdvancedEditor(entitlements) && (
+           <section className="panel">
+             <h2>Project Lab</h2>
+             <p className="panel-lead">
+@@ -1281,6 +1352,7 @@
+                   }}
+                 />
+               </label>
++              <PasswordHint />
+               <label className="check">
+                 <input type="checkbox" checked={roexConfirm} onChange={(e) => setRoexConfirm(e.target.checked)} />
+                 I understand a funded RoEx preview is not sent from this build
+@@ -1306,8 +1378,26 @@
+             </div>
+             <div className="settings-group">
+               <h3>Mix</h3>
++              {isFeatureLocked('smart-mix', entitlements) && (
++                <FeatureLock
++                  id="smart-mix"
++                  title="Smart Mix locked"
++                  message="Smart Mix + Master is included in Pro $40."
++                  onUpgrade={showPlan}
++                />
++              )}
+               <div className="row">
+-                <button className="primary" onClick={() => void runSmartMix()}>
++                <button
++                  className="primary"
++                  onClick={() => {
++                    if (isFeatureLocked('smart-mix', entitlements)) {
++                      setStatus('Smart Mix + Master is included in Pro $40.')
++                      showPlan()
++                      return
++                    }
++                    void runSmartMix()
++                  }}
++                >
+                   SMART MIX+MASTER
+                 </button>
+                 <button onClick={runMicMaster}>Quick Mic Master</button>
+@@ -1369,6 +1459,11 @@
+         {tab === 'takes' && (
+           <section className="panel">
+             <h2>Takes + Export</h2>
++            <ExportBitDepth entitlements={entitlements} />
++            <p className="muted">
++              Max bit depth from entitlements: {exportLimits(entitlements).maxBitDepth}-bit ·{' '}
++              {exportLimits(entitlements).sampleRateHz} Hz
++            </p>
+             {takes.map((t) => (
+               <div className="take" key={t.id}>
+                 <div>
+@@ -1476,6 +1571,22 @@
+           </section>
+         )}
+ 
++        {tab === 'plan' && (
++          <SubscribePanel
++            entitlements={entitlements}
++            onSelectPlan={(plan) => {
++              if (plan === 'free') {
++                applyEntitlementSignal({})
++                setStatus('Plan set to Free.')
++                return
++              }
++              applyEntitlementSignal({ studioPlan: plan, billingStatus: 'active' })
++              setStatus(`Plan set to ${plan}.`)
++            }}
++            onStartTrial={startUiTrial}
++          />
++        )}
++
+         {tab === 'mobile' && (
+           <section className="panel">
+             <h2>Phone / Tablet / PC</h2>
