@@ -1,0 +1,57 @@
+                <li>This repository does not contain signing keys, a private update URL, or a live signature check.</li>
+              </ol>
+            </div>
+          </section>
+        )}
+
+        {tab === 'plan' && (
+          <SubscribePanel
+            entitlements={entitlements}
+            onSelectPlan={(plan) => {
+              if (plan === 'free') {
+                applyEntitlementSignal({})
+                setStatus('Plan set to Free.')
+                return
+              }
+              applyEntitlementSignal({ studioPlan: plan, billingStatus: 'active' })
+              setStatus(`Plan set to ${plan}.`)
+            }}
+            onStartTrial={startUiTrial}
+          />
+        )}
+
+        {tab === 'mobile' && (
+          <section className="panel">
+            <h2>Phone / Tablet / PC</h2>
+            <p>Same Wi‑Fi LAN URL (not just localhost):</p>
+            <div className="lan-card">
+              <code>{lanUrl}</code>
+              {lanUrl && (
+                <div className="qr-wrap">
+                  <QRCodeSVG value={lanUrl} size={168} bgColor="transparent" fgColor="currentColor" />
+                </div>
+              )}
+            </div>
+            <p className="muted">
+              Run <code>npm run dev -- --host</code>, scan the QR from iPhone/Android/tablet, allow mic. No App Store build required.
+            </p>
+            <button
+              className="primary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(lanUrl)
+                  setStatus('LAN URL copied')
+                } catch {
+                  setStatus(lanUrl)
+                }
+              }}
+            >
+              Copy LAN URL
+            </button>
+          </section>
+        )}
+      </main>
+    </div>
+  )
+}
+

@@ -1,0 +1,196 @@
+      const beatRms = Math.sqrt(beatBuf.getChannelData(0).reduce((sum, sample) => sum + sample * sample, 0) / beatBuf.length)
+      const nextVolume = Math.max(0.2, Math.min(1, (0.65 * vocalRms) / Math.max(0.0001, beatRms)))
+      setMaster((current) => ({ ...current, beatVolume: Number(nextVolume.toFixed(2)) }))
+      setStatus(`Balance set beat volume to ${nextVolume.toFixed(2)} from the measured tracks`)
+      return
+    }
+    setStatus('Balance kept your current beat volume. Record a vocal to measure against the beat.')
+  }
+
+  const savePracticePass = async () => {
+    if (!engineRef.current) return
+    if (!recording) {
+      await engineRef.current.startRecording()
+      setRecording(true)
+      setStatus('Practice pass recording on loop…')
+      return
+    }
+    const blob = await engineRef.current.stopRecording()
+    setRecording(false)
+    await persistAsWavTake({
+      name: `Pass ${loopStart.toFixed(1)}–${loopEnd.toFixed(1)}s`,
+      blob,
+      kind: 'pass',
+    })
+    setTakes(await listTakes())
+    setStatus('Practice pass saved to project (WAV)')
+  }
+
+  const exportTake = async (takeId: string, format: 'wav' | 'mp3') => {
+    const take = takes.find((t) => t.id === takeId)
+    if (!take) return
+    let buf = await blobToAudioBuffer(take.blob)
+    if (take.offsetSec) buf = shiftAudioBuffer(buf, take.offsetSec)
+    if (format === 'wav') {
+      const rendered = await exportMasterWav(buf, exportTier)
+      const how = await deliverBlob(rendered.blob, `${take.name}.wav`)
+      const verb = how === 'shared' ? 'Shared' : 'Downloaded'
+      setStatus(`${verb} ${take.name}.wav · ${rendered.label}. ${formatDeliveryNote({ metrics: rendered.metrics, sampleRate: rendered.sampleRate, bits: rendered.bits, bpm })}`)
+      return
+    }
+    const mp3 = await audioBufferToMp3(buf)
+    const how = await deliverBlob(mp3, `${take.name}.mp3`)
+    setStatus(how === 'shared' ? `Shared ${take.name}.mp3` : `Downloaded ${take.name}.mp3`)
+  }
+
+  const applyRapOnBeat = async () => {
+    const target = Math.max(0.05, loopEnd - loopStart)
+    const pass = takes.find((t) => t.kind === 'pass') || takes.find((t) => t.kind === 'infected')
+    if (!pass) {
+      setStatus('Record a practice pass first, then Rap on Beat auto')
+      return
+    }
+    if (!engineRef.current) {
+      engineRef.current = new InfectedAudioEngine(settings)
+      await engineRef.current.init()
+    }
+    setStatus('Stretching saved pass to loop length…')
+    const buf = await blobToAudioBuffer(pass.blob)
+    const speed = rapOnBeatRate(buf.duration, target)
+    setRapRate(speed)
+    const stretched = await engineRef.current.stretchBufferToDuration(buf, target)
+    const wav = (await exportMasterWav(stretched, exportTier)).blob
+    stageBounce(`Timing preview is ready. Pass stretched to ${target.toFixed(2)} s with pitch kept. Preview, then Keep.`, wav, async () => {
+      await saveTake({
+        name: `${pass.name} (on-beat ${target.toFixed(2)}s)`,
+        blob: wav,
+        kind: 'pass',
+      })
+      setTakes(await listTakes())
+      setStatus(`Timing kept at ${target.toFixed(2)} s. The original pass is unchanged.`)
+    })
+  }
+
+  if (!hostReady) {
+    return (
+      <div className="gate">
+        <p className="eyebrow">Infected Voices</p>
+        <h1>Checking account…</h1>
+      </div>
+    )
+  }
+
+  if (host && !user) {
+    return (
+      <div className="gate">
+        <p className="eyebrow">Vocal Lab channel v0.4.1 · Studio {STUDIO_VERSION}</p>
+        <h1>Sign in to open Studio.</h1>
+        <p>
+          The recording workspace stays behind the existing account sign-in. A signed-in account is Free until Basic or Pro. The GitHub source zipball is not the Windows installer.
+        </p>
+        {hostError && <p className="error">{hostError}</p>}
+        <label className="field" style={{ maxWidth: 360, margin: '12px auto', textAlign: 'left' }}>
+          Signup password
+          <input type="password" autoComplete="new-password" placeholder="Create a password" readOnly value="" />
+        </label>
+        <PasswordHint />
+        <div className="cta-row">
+          <button
+            className="primary"
+            onClick={() => {
+              void (async () => {
+                try {
+                  setHostError('')
+                  const signed = await host.auth.signIn()
+                  setUser(signed.user ?? (await host.auth.getUser()))
+                } catch (error) {
+                  setHostError(error instanceof Error ? error.message : String(error))
+                }
+              })()
+            }}
+          >
+            Sign in
+          </button>
+          <a className="nav-link" href="./studio.html">Arrangement Studio</a>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="app">
+      <nav className="nav">
+        <div className="brand">
+          Infected Voices
+          <span>Studio {STUDIO_VERSION}</span>
+        </div>
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            className={tab === t.id ? 'active' : ''}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+        <a className="nav-link" href="./studio.html">
+          Arrangement
+        </a>
+        <div className="hint">Local-only · quiet studio · one indigo accent · cue metronome stays out of the bounce</div>
+      </nav>
+
+      <main className="main">
+        <div className="topbar">
+          <h1>{TABS.find((t) => t.id === tab)?.label}</h1>
+          <div className="transport">
+            <span className="pill">
+              BAR {barBeat.bar} · BEAT {barBeat.beat}
+            </span>
+            <span className={`pill ${engineOn ? 'on' : ''}`}>{engineOn ? 'ENGINE ON' : 'ENGINE OFF'}</span>
+            <span className={`pill ${metro ? 'on' : ''}`}>METRO {metro ? 'CUE' : 'OFF'}</span>
+            <span className={`pill ${recording ? 'warn' : ''}`}>{recording ? 'REC' : 'IDLE'}</span>
+            <label className="field mode-field">
+              Layout
+              <select
+                value={uiMode}
+                onChange={(e) => setUiMode(e.target.value as typeof uiMode)}
+              >
+                <option value="auto">Auto</option>
+                <option value="ios">iOS</option>
+                <option value="android">Android</option>
+                <option value="pc">PC</option>
+              </select>
+            </label>
+            <button className="ghost" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}>
+              {theme === 'dark' ? 'Light' : 'Dark'}
+            </button>
+            {host && user && (
+              <button
+                className="ghost"
+                onClick={() => {
+                  void host.auth.signOut().then(() => setUser(null))
+                }}
+              >
+                {user.name || user.email || 'Sign out'}
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="status">{status}</div>
+        <p className="meter-readout" aria-live="polite">{trackPeak}. Aim lead peaks around −12 to −6 dBFS. Master sample peak and the delivery note print after a bounce.</p>
+        {staged && (
+          <div className="keep-bar" id="ivKeepBar">
+            <p>{staged.note}</p>
+            <audio src={staged.previewUrl} controls />
+            <div className="cta-row">
+              <button onClick={() => { const el = document.querySelector('#ivKeepBar audio'); if (el instanceof HTMLAudioElement) void el.play() }}>Preview</button>
+              <button className="primary" onClick={() => void staged.apply()}>Keep</button>
+              <button onClick={() => { clearStage(); setStatus('Undo discarded the preview. The original take is unchanged.') }}>Undo</button>
+            </div>
+          </div>
+        )}
+
+        {tab === 'studio' && (
+          <section className="panel">
+            <h2>Engine</h2>
+            <p className="panel-lead">

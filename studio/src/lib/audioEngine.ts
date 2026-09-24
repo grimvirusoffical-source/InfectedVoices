@@ -412,6 +412,21 @@ export class InfectedAudioEngine {
     return await ox.startRendering()
   }
 
+
+  /** Live sample peak in dBFS from the post-gate analyser tap. */
+  samplePeakDb(): number | null {
+    if (!this.analyser || !this.analyseBuf) return null
+    this.analyser.getFloatTimeDomainData(this.analyseBuf as unknown as Float32Array<ArrayBuffer>)
+    let peak = 0
+    for (let i = 0; i < this.analyseBuf.length; i++) {
+      const sample = this.analyseBuf[i]
+      const mag = sample < 0 ? -sample : sample
+      if (mag > peak) peak = mag
+    }
+    if (peak < 1e-12) return Number.NEGATIVE_INFINITY
+    return 20 * Math.log10(peak)
+  }
+
   /** Stretch a recorded buffer to target duration (pitch-preserving Bungee) */
   async stretchBufferToDuration(audioBuffer: AudioBuffer, targetSec: number): Promise<AudioBuffer> {
     const speed = Math.min(2, Math.max(0.5, audioBuffer.duration / Math.max(0.05, targetSec)))

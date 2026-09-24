@@ -1,0 +1,237 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { InfectedAudioEngine, pocketAssistOffsetSec, rapOnBeatRate } from './lib/audioEngine'
+import {
+  KEYS,
+  defaultSettings,
+  factoryPresets,
+  uid,
+  type Preset,
+  type VocalSettings,
+} from './lib/presets'
+import {
+  deletePreset,
+  getProject,
+  listPresets,
+  listTakes,
+  savePreset,
+  saveProject,
+  saveTake,
+  seedFactoryPresets,
+  type SongSection,
+} from './lib/projectStore'
+import { estimateKey, sliceChannel } from './lib/keyEstimate'
+import { loadHostSession, type HostModule, type HostUser } from './hostSession'
+import {
+  audioBufferToMp3,
+  exportMasterWav,
+  blobToAudioBuffer,
+  micMasterMix,
+  smartMixMaster,
+  ultimateMicMaster,
+  type MicMasterOptions,
+} from './lib/exportAudio'
+import { deliverBlob } from './lib/deliver'
+import { clampPocketSec, POCKET_LIMIT_SEC } from './lib/pocket'
+import { loopRangeFromBars, secToBar } from './lib/transport'
+import {
+  buildEntitlements,
+  markTrialStarted,
+  type EntitlementSignal,
+} from './lib/entitlements'
+import {
+  canUseAdvancedEditor,
+  canUseSmartMix,
+  exportLimits,
+  isFeatureLocked,
+} from './lib/gates'
+import { useEntitlements } from './hooks/useEntitlements'
+import { ExportBitDepth, FeatureLock, PasswordHint, SubscribePanel } from './components'
+import { formatDeliveryNote } from './lib/delivery'
+import { QRCodeSVG } from 'qrcode.react'
+import { shiftAudioBuffer } from './lib/audioShift'
+import { STUDIO_VERSION } from './version'
+import { VOCAL_LAB_V040 } from './releases'
+import './index.css'
+import './styles/gates.css'
+
+type Tab =
+  | 'studio'
+  | 'beat'
+  | 'voice'
+  | 'settings'
+  | 'practice'
+  | 'lab'
+  | 'takes'
+  | 'plan'
+  | 'mobile'
+  | 'desktop'
+  | 'updates'
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'studio', label: 'Studio' },
+  { id: 'beat', label: 'Beat Deck' },
+  { id: 'voice', label: 'Voice + Presets' },
+  { id: 'settings', label: 'Deep Settings' },
+  { id: 'practice', label: 'Rap on Beat' },
+  { id: 'lab', label: 'Project Lab' },
+  { id: 'takes', label: 'Takes + Export' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'mobile', label: 'Mobile Connect' },
+  { id: 'desktop', label: 'Windows' },
+  { id: 'updates', label: 'Updates' },
+]
+
+const MASTER_DEFAULT: MicMasterOptions = {
+  beatVolume: 0.65,
+  loudness: 62,
+  headroomDb: 1.5,
+  ducking: 55,
+  width: 18,
+  tone: 54,
+  vocalsOnly: false,
+}
+
+function Knob({
+  label,
+  value,
+  onChange,
+  min = 0,
+  max = 100,
+}: {
+  label: string
+  value: number
+  onChange: (n: number) => void
+  min?: number
+  max?: number
+}) {
+  return (
+    <label className="field">
+      <span>
+        {label} <strong style={{ color: 'var(--text-primary)' }}>{Math.round(value)}</strong>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+    </label>
+  )
+}
+
+export default function App() {
+  const [tab, setTab] = useState<Tab>('studio')
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [engineOn, setEngineOn] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [settings, setSettings] = useState<VocalSettings>(factoryPresets()[0].settings)
+  const [presets, setPresets] = useState<Preset[]>([])
+  const [activePresetId, setActivePresetId] = useState('grim')
+  const [bpm, setBpm] = useState(140)
+  const [pos, setPos] = useState(0)
+  const [loopOn, setLoopOn] = useState(false)
+  const [loopStart, setLoopStart] = useState(0)
+  const [loopEnd, setLoopEnd] = useState(8)
+  const [loopStartBar, setLoopStartBar] = useState(1)
+  const [loopEndBar, setLoopEndBar] = useState(2)
+  const [pocketMs, setPocketMs] = useState(0)
+  const [compensationMs, setCompensationMs] = useState(0)
+  const [sections, setSections] = useState<SongSection[]>([])
+  const [master, setMaster] = useState<MicMasterOptions>(MASTER_DEFAULT)
+  const [roexKey, setRoexKey] = useState('')
+  const [roexConfirm, setRoexConfirm] = useState(false)
+  const [correctOnBalance, setCorrectOnBalance] = useState(true)
+  const [uiMode, setUiMode] = useState<'auto' | 'ios' | 'android' | 'pc'>('auto')
+  const [host, setHost] = useState<HostModule | null>(null)
+  const [hostReady, setHostReady] = useState(false)
+  const [user, setUser] = useState<HostUser | null>(null)
+  const [hostError, setHostError] = useState('')
+  const [entitlementSignal, setEntitlementSignal] = useState<EntitlementSignal>(() => {
+    try {
+      const raw = localStorage.getItem('iv-entitlements-signal')
+      if (raw) return JSON.parse(raw) as EntitlementSignal
+    } catch {
+      /* Free until HTTP stub ready */
+    }
+    return {}
+  })
+  const { entitlements, refresh: refreshEntitlements } = useEntitlements(entitlementSignal)
+  const exportTier = entitlements.tier
+  const showPlan = () => setTab('plan')
+  const applyEntitlementSignal = (next: EntitlementSignal) => {
+    setEntitlementSignal(next)
+    try {
+      localStorage.setItem('iv-entitlements-signal', JSON.stringify(next))
+    } catch {
+      /* ignore */
+    }
+    refreshEntitlements(next)
+  }
+  const startUiTrial = (tier: 'basic' | 'pro') => {
+    const endsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const next = markTrialStarted(entitlements, tier, endsAt, { cardAuthorized: true })
+    applyEntitlementSignal({
+      studioPlan: next.tier,
+      trialPlan: tier,
+      trialEndsAt: endsAt,
+      billingStatus: 'trialing',
+      basicTrialUsedAt: tier === 'basic' || !next.trialEligible.basic ? Date.now() : entitlementSignal.basicTrialUsedAt,
+      proTrialUsedAt: tier === 'pro' || !next.trialEligible.pro ? Date.now() : entitlementSignal.proTrialUsedAt,
+    })
+    setStatus(`Started 7-day ${tier} trial (card-upfront).`)
+    setTab('plan')
+  }
+  const settingsRef = useRef(settings)
+  const sectionsRef = useRef(sections)
+  const undoMaster = useRef<{ settings: VocalSettings; master: MicMasterOptions } | null>(null)
+  settingsRef.current = settings
+  sectionsRef.current = sections
+  const [metro, setMetro] = useState(false)
+  const [beatName, setBeatName] = useState<string | null>(null)
+  const [beatBuf, setBeatBuf] = useState<AudioBuffer | null>(null)
+  const [waveformPeaks, setWaveformPeaks] = useState<number[]>([])
+  const [takes, setTakes] = useState<Awaited<ReturnType<typeof listTakes>>>([])
+  const [status, setStatus] = useState('Ready')
+  const [trackPeak, setTrackPeak] = useState('Track peak —')
+  const [staged, setStaged] = useState<{ note: string; previewUrl: string; apply: () => Promise<void> } | null>(null)
+  const stagedRef = useRef<typeof staged>(null)
+  const [customName, setCustomName] = useState('')
+  const [lanUrl, setLanUrl] = useState('')
+  const [rapRate, setRapRate] = useState(1)
+  const engineRef = useRef<InfectedAudioEngine | null>(null)
+  const vocalBufRef = useRef<AudioBuffer | null>(null)
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    if (!engineOn) {
+      setTrackPeak('Track peak —')
+      return
+    }
+    const timer = window.setInterval(() => {
+      const peak = engineRef.current?.samplePeakDb()
+      if (peak == null || !Number.isFinite(peak)) {
+        setTrackPeak('Track peak —')
+        return
+      }
+      const clip = peak >= -0.1 ? ' · CLIP' : ''
+      setTrackPeak(`Track peak ${peak.toFixed(1)} dBFS${clip}`)
+    }, 120)
+    return () => window.clearInterval(timer)
+  }, [engineOn])
+
+  useEffect(() => {
+    ;(async () => {
+      await seedFactoryPresets()
+      setPresets(await listPresets())
+      const proj = await getProject()
+      let bootEntitlements = buildEntitlements({})
+      try {
+        const rawSignal = localStorage.getItem('iv-entitlements-signal')
+        if (rawSignal) bootEntitlements = buildEntitlements(JSON.parse(rawSignal))
+      } catch {
+        /* Free */
+      }
