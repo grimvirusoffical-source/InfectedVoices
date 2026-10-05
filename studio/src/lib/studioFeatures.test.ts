@@ -48,7 +48,7 @@ test('published v0.4.0 artifact is the Release source zipball', () => {
   assert.equal(pkg.redx.install_command, REDX_INSTALL_COMMAND)
   assert.equal(REDX_INSTALL_COMMAND, 'npm install --include=dev --ignore-scripts')
   const buildBrowser = readFileSync(new URL('../../../scripts/build-browser.mjs', import.meta.url), 'utf8')
-  assert.match(buildBrowser, /install','--include=dev','--ignore-scripts','--prefix'/)
+  assert.match(buildBrowser, /ci','--include=dev','--ignore-scripts','--prefix'/)
 })
 
 test('project lab bar loop is 4/4 at the session bpm', () => {

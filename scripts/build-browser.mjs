@@ -82,9 +82,11 @@ await fs.rm(path.join(out,'sw.js'),{force:true});
 
 const studioDir=path.join(root,'studio');
 const studioOut=path.join(root,'.browser-studio');
-const npmBin=process.platform==='win32'?'npm.cmd':'npm';
-execFileSync(npmBin,['install','--include=dev','--ignore-scripts','--prefix',studioDir],{cwd:root,stdio:'inherit'});
-execFileSync(npmBin,['run','build:host','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+const npmCli=process.env.npm_execpath;
+if(!npmCli)throw Error('Start this build through npm run so the installed npm CLI can be resolved.');
+execFileSync(process.execPath,[npmCli,'ci','--include=dev','--ignore-scripts','--prefix',studioDir],{cwd:root,stdio:'inherit'});
+execFileSync(process.execPath,[path.join(studioDir,'scripts','copy-worklets.mjs')],{cwd:studioDir,stdio:'inherit'});
+execFileSync(process.execPath,[npmCli,'run','build:host','--prefix',studioDir],{cwd:root,stdio:'inherit'});
 await fs.copyFile(path.join(studioOut,'index.html'),path.join(out,'index.html'));
 await fs.cp(path.join(studioOut,'assets'),path.join(out,'assets'),{recursive:true});
 for(const file of ['favicon.svg','bungee-processor-bundled.js','audio-processor.worker.bundle.js','manifest.webmanifest']){

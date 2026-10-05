@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "note": "Product names and release gates only. This change does not train or serve model weights.",
+  "models": [
+    {
+      "id": "virus-master",
+      "name": "Virus Master",
+      "featureId": "ai-mix",
+      "purpose": "Mixing and mastering",
+      "productionReady": false,
+      "weights": null
+    },
+    {
+      "id": "grim-vocals",
+      "name": "Grim Vocals",
+      "featureId": "ai-beat",
+      "purpose": "Vocal-to-beat alignment",
+      "productionReady": false,
+      "weights": null
+    },
+    {
+      "id": "grim-virus-auto-tune",
+      "name": "Grim Virus Auto Tune",
+      "featureId": "ai-tune",
+      "purpose": "Pitch correction",
+      "productionReady": false,
+      "weights": null
+    }
+  ]
+}

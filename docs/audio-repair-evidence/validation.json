@@ -1,0 +1,73 @@
+{
+  "baseCommit": "4c2e433abf8a53956810f22d21933d4224bd93e1",
+  "platform": "Windows",
+  "nodeVersion": "v24.21.0",
+  "startedAt": "2026-09-24T03:59:29.434393+00:00",
+  "sourceSha256": {
+    "package.json": "11d98d1627e7adb0f6c2878c0b4c3a788528ceed5b77dbe7a75a7499237e4fc6",
+    "package-lock.json": "8af891d94722f7010b194cbe86e403426077e74b02b04e04722a2235c37924b0",
+    "scripts/build-web.mjs": "939bd6bbe910573f1455eb56f753343b88fb07c61aa93306e497bb33a02181d3",
+    "scripts/build-browser.mjs": "59cc5fa7dc012072aa098f57ea88735d69f129e8fac68953e686d7118351cdd8",
+    "scripts/verify-web.mjs": "081bc515c826c02c44d912ed4bbff39bec8d0c0fe56a25767c73be9e7f480c86",
+    "studio/package.json": "39ce886d7a5d856470840a544d7704e4ee6e0e00fda6238a48dd3d158ec79a27",
+    "studio/package-lock.json": "f48a89ead54911e36d86755c467460f4297e4eac9c8e250a25cc1ae0903917db",
+    "studio/src/lib/audioEngine.ts": "80e4a6ea7786986c11dd65dc44cdd08d72441d187d78bdbd82c6a178de234b6c",
+    "studio/src/lib/pitchMath.ts": "356eb401506b563255cd40deb8ff8105aa302d6fba24fa5f7d803643d0895d81",
+    "studio/src/lib/audioRegressions.test.ts": "9f20aac7d5b87e756d12759ecfa86d4ad36d5203217dff0dd04f9c7a9ed75cd0",
+    "studio/src/lib/studioFeatures.test.ts": "1d02ef18025a6f2b59aabe0de4cce1dfc0cd10a85e99f98389a4c4a1e06ecb92",
+    ".github/workflows/unit-tests.yml": "e0bb55e40830d4ce8829d471b4e71316dd6b6fdb8a5f566069a277caea571883",
+    "models/registry.json": "5926f0559efb1ff3a9f163f27970b02cc17e8aea406c3d677f05bfdcab7ca5fe"
+  },
+  "runs": [
+    {
+      "repeat": 1,
+      "check": "unit",
+      "exitCode": 0
+    },
+    {
+      "repeat": 1,
+      "check": "browser-and-mobile-build",
+      "exitCode": 0
+    },
+    {
+      "repeat": 1,
+      "check": "mobile-payload-verifier",
+      "exitCode": 0
+    },
+    {
+      "repeat": 2,
+      "check": "unit",
+      "exitCode": 0
+    },
+    {
+      "repeat": 2,
+      "check": "browser-and-mobile-build",
+      "exitCode": 0
+    },
+    {
+      "repeat": 2,
+      "check": "mobile-payload-verifier",
+      "exitCode": 0
+    },
+    {
+      "repeat": 3,
+      "check": "unit",
+      "exitCode": 0
+    },
+    {
+      "repeat": 3,
+      "check": "browser-and-mobile-build",
+      "exitCode": 0
+    },
+    {
+      "repeat": 3,
+      "check": "mobile-payload-verifier",
+      "exitCode": 0
+    }
+  ],
+  "signedAppsReleased": false,
+  "productionDeployed": false,
+  "modelsTrained": false,
+  "finishedAt": "2026-09-24T04:01:18.125041+00:00",
+  "unchangedSource": true
+}
