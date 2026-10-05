@@ -1,0 +1,39 @@
+name: Infected Voices Web Shell
+
+on:
+  push:
+    branches: ['main', 'shell-web']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  web-shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the Core pin commit can be compared against HEAD.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned dependencies
+        run: npm ci --ignore-scripts
+      - name: Assert Core pin (4d280e8, no Core drift)
+        run: node shells/web/check-core-pin.mjs
+      - name: Run Core unit tests
+        run: npm test
+      - name: Run web shell parity tests
+        run: npm --prefix shells/web test
+      - name: Build web shell and verify pin + testids in bundle
+        run: npm --prefix shells/web run build
+      - name: Upload web shell payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: infected-voices-web-shell-${{ github.sha }}
+          path: browser-dist/
+          if-no-files-found: error
+          retention-days: 14

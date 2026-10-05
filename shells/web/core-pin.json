@@ -1,0 +1,10 @@
+{
+  "shell": "web",
+  "repo": "grimvirusoffical-source/InfectedVoices",
+  "branch": "main",
+  "core": "4d280e871dc31916549ba317032300510403a8b2",
+  "coreShort": "4d280e8",
+  "corePr": 8,
+  "studioVersion": "0.7.0",
+  "note": "Web shell = the RedXAIHost browser deploy (npm run build:browser -> browser-dist/). Core files outside the shell paths must be byte-identical to this commit or the shell build fails."
+}

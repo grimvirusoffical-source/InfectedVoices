@@ -1,0 +1,13 @@
+{
+  "name": "infected-voices-web-shell",
+  "private": true,
+  "version": "0.7.0",
+  "type": "module",
+  "description": "Web shell for Infected Voices Studio, pinned to Core 4d280e8. Wraps the existing build:browser payload; does not fork StudioApp.",
+  "scripts": {
+    "pin": "node check-core-pin.mjs",
+    "build": "node build-web-shell.mjs",
+    "verify": "node verify-web-shell.mjs",
+    "test": "node --experimental-strip-types --test parity.test.ts"
+  }
+}
