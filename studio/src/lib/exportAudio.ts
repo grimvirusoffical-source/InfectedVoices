@@ -1,4 +1,5 @@
 import { Mp3Encoder } from '@breezystack/lamejs'
+import { measureDelivery, type DeliveryMetrics } from './delivery'
 
 export type WavBits = 16 | 24
 
@@ -8,10 +9,20 @@ export function exportSpec(tier: string): { sampleRate: number; bits: WavBits; l
   return { sampleRate: 44100, bits: 16, label: '16-bit WAV' }
 }
 
-export async function exportMasterWav(buffer: AudioBuffer, tier: string): Promise<{ blob: Blob; label: string }> {
+export async function exportMasterWav(
+  buffer: AudioBuffer,
+  tier: string,
+): Promise<{ blob: Blob; label: string; metrics: DeliveryMetrics; sampleRate: number; bits: WavBits }> {
   const spec = exportSpec(tier)
   const matched = await matchSampleRate(buffer, spec.sampleRate)
-  return { blob: await audioBufferToWav(matched, spec.bits), label: spec.label }
+  const blob = await audioBufferToWav(matched, spec.bits)
+  return {
+    blob,
+    label: spec.label,
+    metrics: measureDelivery(matched),
+    sampleRate: spec.sampleRate,
+    bits: spec.bits,
+  }
 }
 
 export async function audioBufferToWav(buffer: AudioBuffer, bits: WavBits = 16): Promise<Blob> {

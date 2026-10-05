@@ -1,0 +1,174 @@
+                      setStatus('Smart Mix + Master is included in Pro $40.')
+                      showPlan()
+                      return
+                    }
+                    void runSmartMix()
+                  }}
+                >
+                  SMART MIX+MASTER
+                </button>
+                <button onClick={runMicMaster}>Quick Mic Master</button>
+                <label className="field" style={{ maxWidth: 280 }}>
+                  Autotune recorded file
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) void processOfflineFile(f)
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="muted">
+                SMART MIX+MASTER levels the vocal, ducks the beat under the voice, then compresses and limits the bus.
+              </p>
+            </div>
+            <div className="settings-group">
+              <h3>Pocket Assist · ±80 ms</h3>
+              <label className="field">
+                Manual nudge <strong style={{ color: 'var(--text-primary)' }}>{pocketMs} ms</strong>
+                <input
+                  type="range"
+                  min={-80}
+                  max={80}
+                  value={pocketMs}
+                  onChange={(e) => setPocketMs(Number(e.target.value))}
+                />
+              </label>
+            </div>
+            <div style={{ marginTop: 16 }}>
+              {takes.slice(0, 8).map((t) => (
+                <div className="take" key={t.id}>
+                  <div>
+                    <strong>{t.name}</strong>
+                    <div className="muted">
+                      {t.kind}
+                      {t.offsetSec != null ? ` · pocket ${(t.offsetSec * 1000).toFixed(1)}ms` : ''}
+                    </div>
+                  </div>
+                  <div className="row">
+                    <button onClick={() => void runPocketAssist(t.id)}>Auto pocket</button>
+                    <button onClick={() => void runManualPocket(t.id)}>Nudge ±80</button>
+                  </div>
+                </div>
+              ))}
+              {takes.length === 0 && (
+                <div className="empty">
+                  <strong>No stems yet</strong>
+                  Import a beat to set the grid and BPM, then record a lead.
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {tab === 'takes' && (
+          <section className="panel">
+            <h2>Takes + Export</h2>
+            <ExportBitDepth entitlements={entitlements} />
+            <p className="muted">
+              Max bit depth from entitlements: {exportLimits(entitlements).maxBitDepth}-bit ·{' '}
+              {exportLimits(entitlements).sampleRateHz} Hz
+            </p>
+            {takes.map((t) => (
+              <div className="take" key={t.id}>
+                <div>
+                  <strong>{t.name}</strong>
+                  <div className="muted">
+                    {t.kind} · {new Date(t.createdAt).toLocaleString()}
+                  </div>
+                </div>
+                <div className="row">
+                  <button onClick={() => void exportTake(t.id, 'wav')}>WAV</button>
+                  <button onClick={() => void exportTake(t.id, 'mp3')}>MP3</button>
+                </div>
+              </div>
+            ))}
+            {takes.length === 0 && (
+              <div className="empty">
+                <strong>Nothing to export yet</strong>
+                Record, process, or Mic Master a take first.
+              </div>
+            )}
+          </section>
+        )}
+
+        {tab === 'desktop' && (
+          <section className="panel">
+            <h2>Windows channel</h2>
+            <p className="panel-lead">
+              Phone and tablet builds install from the App Store or Google Play. This page does not host an ipa or aab. Windows is a signed build with its SHA-256 published beside the installer. The {VOCAL_LAB_V040.name} GitHub zipball is source, not the Windows app. There is no Mac .app.
+            </p>
+            <div className="take">
+              <div>
+                <strong>Get the app</strong>
+                <div className="muted">/get and /download are the same page. Open web goes to /voices.</div>
+              </div>
+              <a className="pill on" href="/download">Download</a>
+            </div>
+            <div className="take">
+              <div>
+                <strong>v0.4.1 · vocal lab channel</strong>
+                <div className="muted">
+                  Bar loop, Pocket Assist, Ultimate Mic Master, Grim Beats, and layout modes in this host. No second zipball and no installer URL.
+                </div>
+              </div>
+              <span className="pill">In this host</span>
+            </div>
+            <ol className="notes">
+              <li>iPhone and iPad install from the App Store. Android installs from Google Play. This page does not host an ipa or an aab.</li>
+              <li><a href="/voices">Open web</a> serves the studio at /voices.</li>
+              <li>Windows is a signed installer. Its SHA-256 is published with that file. An unsigned local package is not the download.</li>
+              <li>No Mac .app is published. Tag {VOCAL_LAB_V040.tag} on GitHub is source only.</li>
+            </ol>
+            <p className="muted">
+              A signing key stays outside this repository. Do not treat the source archive as the Windows app.
+            </p>
+          </section>
+        )}
+
+        {tab === 'updates' && (
+          <section className="panel">
+            <h2>Updates</h2>
+            <p className="panel-lead">
+              Studio {STUDIO_VERSION}. Phone and tablet builds update through the App Store or Google Play. Windows can use a signed private channel once a release key is provisioned outside this repository.
+            </p>
+            <div className="settings-group">
+              <h3>This session</h3>
+              <p className="muted">
+                {window.ivNative?.platform
+                  ? `Native ${window.ivNative.platform} · ${window.ivNative.nativeVersion ?? STUDIO_VERSION}. Store listing opens from the app shell. This build does not download replacement code.`
+                  : window.ivDesktop?.platform
+                    ? `Desktop shell · ${window.ivDesktop.version ?? STUDIO_VERSION}.`
+                    : 'Browser session. Host the production build as static files. Nothing here phones home for an update.'}
+              </p>
+              <div className="cta-row">
+                {window.ivNative && (
+                  <button
+                    className="primary"
+                    onClick={() => {
+                      void window.ivOpenNativeUpdates?.()
+                    }}
+                  >
+                    Open store updates
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    void (async () => {
+                      const report = await window.ivDesktop?.checkUpdates?.()
+                      setStatus(report?.message ?? 'No desktop updater is attached. Signed private updates stay unwired until a release key exists outside the repo.')
+                    })()
+                  }}
+                >
+                  Check desktop channel
+                </button>
+              </div>
+            </div>
+            <div className="settings-group">
+              <h3>Signed private updates</h3>
+              <ol className="notes">
+                <li>The desktop shell reads a release manifest (version, file names, sizes, hashes).</li>
+                <li>It verifies a detached signature with a public key installed beside the app, not stored in this source tree.</li>
+                <li>You approve the install. Rollback keeps takes and presets in place.</li>

@@ -1,0 +1,162 @@
+              message="Upgrade to Basic to open Project Lab, GRIM, and precision tools."
+              onUpgrade={showPlan}
+            />
+          </section>
+        )}
+        {tab === 'lab' && canUseAdvancedEditor(entitlements) && (
+          <section className="panel">
+            <h2>Project Lab</h2>
+            <p className="panel-lead">
+              Bar/beat loop, Pocket Assist within ±80 ms, Mic Master, and SMART MIX+MASTER. Offline autotune uses the same key, scale, and GRIM settings as the live engine.
+            </p>
+            <div className="settings-group">
+              <h3>Bar / beat loop</h3>
+              <div className="grid3">
+                <label className="field">
+                  Start bar
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={loopStartBar}
+                    onChange={(e) => setLoopStartBar(Number(e.target.value))}
+                  />
+                </label>
+                <label className="field">
+                  End bar
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={loopEndBar}
+                    onChange={(e) => setLoopEndBar(Number(e.target.value))}
+                  />
+                </label>
+                <label className="field">
+                  Grid
+                  <span className="muted">4/4 · {bpm} BPM · bars {loopStartBar}–{loopEndBar}</span>
+                </label>
+              </div>
+              <div className="cta-row">
+                <button className="primary" onClick={applyBarLoop}>
+                  Loop these bars
+                </button>
+                <span className="muted">
+                  {loopRangeFromBars(loopStartBar, loopEndBar, bpm).startSec.toFixed(2)}s –{' '}
+                  {loopRangeFromBars(loopStartBar, loopEndBar, bpm).endSec.toFixed(2)}s
+                  {loopOn ? ' · transport loop on' : ''}
+                </span>
+              </div>
+            </div>
+            <div className="settings-group">
+              <h3>Ultimate Mic Master</h3>
+              <p className="muted">
+                Pick a voice style, then set loudness, headroom, ducking, width and tone. Balance measures the vocal against the beat before the render. Originals stay in the project.
+              </p>
+              <div className="row">
+                <button onClick={() => loadPreset(presets.find((item) => item.id === 'clean-rap') ?? factoryPresets()[0])}>Clean rap</button>
+                <button onClick={() => loadPreset(presets.find((item) => item.id === 'melodic') ?? factoryPresets()[1])}>Singing</button>
+                <button onClick={() => loadPreset(presets.find((item) => item.id === 'grim') ?? factoryPresets()[0])}>Grim abyss</button>
+              </div>
+              <div className="knobs">
+                <Knob label="Loudness" value={master.loudness} onChange={(v) => setMaster({ ...master, loudness: v })} />
+                <Knob label="Headroom dB" value={master.headroomDb} min={0.5} max={6} onChange={(v) => setMaster({ ...master, headroomDb: v })} />
+                <Knob label="Ducking" value={master.ducking} onChange={(v) => setMaster({ ...master, ducking: v })} />
+                <Knob label="Width" value={master.width} onChange={(v) => setMaster({ ...master, width: v })} />
+                <Knob label="Tone" value={master.tone} onChange={(v) => setMaster({ ...master, tone: v })} />
+                <label className="field">
+                  Beat volume <strong style={{ color: 'var(--text-primary)' }}>{master.beatVolume.toFixed(2)}</strong>
+                  <input
+                    type="range"
+                    min={0}
+                    max={120}
+                    value={Math.round(master.beatVolume * 100)}
+                    onChange={(e) => setMaster({ ...master, beatVolume: Number(e.target.value) / 100 })}
+                  />
+                </label>
+              </div>
+              <div className="cta-row">
+                <label className="check">
+                  <input type="checkbox" checked={correctOnBalance} onChange={(e) => setCorrectOnBalance(e.target.checked)} />
+                  Enable pitch correction when balancing
+                </label>
+                <label className="check">
+                  <input type="checkbox" checked={master.vocalsOnly} onChange={(e) => setMaster({ ...master, vocalsOnly: e.target.checked })} />
+                  Vocals only
+                </label>
+              </div>
+              <div className="cta-row">
+                <button onClick={() => void balanceMix()}>Balance</button>
+                <button
+                  onClick={() => {
+                    const previous = undoMaster.current
+                    if (!previous) return
+                    setSettings(previous.settings)
+                    setMaster(previous.master)
+                    engineRef.current?.applySettings(previous.settings)
+                    setStatus('Undid the last balance')
+                  }}
+                >
+                  Undo mix
+                </button>
+                <button className="primary" onClick={() => void runUltimateMaster()}>Ultimate Mic Master</button>
+              </div>
+            </div>
+            <div className="settings-group">
+              <h3>Infected Mixer + Grim Beats</h3>
+              <p className="muted">
+                Grim Beats is local vocal preparation. Your original take stays in the project. Infected Mixer is for a RoEx key you already fund. This page stores that key only in this browser and does not upload audio or spend credits.
+              </p>
+              <label className="field">
+                Your RoEx key
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={roexKey}
+                  placeholder="Paste your own key"
+                  onChange={(e) => {
+                    setRoexKey(e.target.value)
+                    if (e.target.value) localStorage.setItem('iv-roex-key', e.target.value)
+                    else localStorage.removeItem('iv-roex-key')
+                  }}
+                />
+              </label>
+              <PasswordHint />
+              <label className="check">
+                <input type="checkbox" checked={roexConfirm} onChange={(e) => setRoexConfirm(e.target.checked)} />
+                I understand a funded RoEx preview is not sent from this build
+              </label>
+              <div className="cta-row">
+                <button
+                  className="primary"
+                  disabled={!roexConfirm}
+                  onClick={() => {
+                    if (!roexKey.trim()) {
+                      setStatus('Paste your own RoEx key, or use Grim Beats locally')
+                      return
+                    }
+                    setStatus('provider_not_configured. No audio was uploaded, no credits were spent, and no finished master was created.')
+                  }}
+                >
+                  Save key, preview locally
+                </button>
+                <button onClick={() => loadPreset(presets.find((item) => item.id === 'grim') ?? factoryPresets()[0])}>
+                  Apply Grim Beats locally
+                </button>
+              </div>
+            </div>
+            <div className="settings-group">
+              <h3>Mix</h3>
+              {isFeatureLocked('smart-mix', entitlements) && (
+                <FeatureLock
+                  id="smart-mix"
+                  title="Smart Mix locked"
+                  message="Smart Mix + Master is included in Pro $40."
+                  onUpgrade={showPlan}
+                />
+              )}
+              <div className="row">
+                <button
+                  className="primary"
+                  onClick={() => {
+                    if (isFeatureLocked('smart-mix', entitlements)) {

@@ -42,7 +42,7 @@ lab=lab.replace('content="#100d17"','content="#09090B"').replace('</head>','  <l
 await fs.writeFile(path.join(out,'lab','index.html'),lab);
 await fs.rm(path.join(out,'sw.js'),{force:true});
 await fs.rm(path.join(out,'manifest.webmanifest'),{force:true});
-for(const html of ['studio.html','lab/index.html']){const p=path.join(out,html),t=await fs.readFile(p,'utf8');if(/serviceWorker\.register|src=['"]\.\/?entry\.js/.test(t))throw Error('Native build still contains a web bootstrap/update path: '+html);}
+for(const html of ['studio.html','lab/index.html']){const p=path.join(out,html),t=await fs.readFile(p,'utf8');if(/serviceWorker\.register|src=['"]\.?\/?entry\.js/.test(t))throw Error('Native build still contains a web bootstrap/update path: '+html);}
 const studioDir=path.join(root,'studio');
 const vocalOut=path.join(root,'.vocal-lab');
 const npmCli=process.env.npm_execpath;

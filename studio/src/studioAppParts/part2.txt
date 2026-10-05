@@ -1,0 +1,197 @@
+        kind: 'infected',
+      })
+      setTakes(await listTakes())
+      setStatus(`Saved ${take.name}`)
+    }
+  }
+
+  const loadPreset = (p: Preset) => {
+    if (p.settings.grimOn && isFeatureLocked('advanced', entitlements)) {
+      setStatus('GRIM is included in Basic $20.')
+      showPlan()
+      return
+    }
+    setActivePresetId(p.id)
+    setSettings(p.settings)
+    engineRef.current?.applySettings(p.settings)
+    void saveProject({ settings: p.settings })
+  }
+
+  const saveCustom = async () => {
+    const name = customName.trim() || `Custom ${presets.length + 1}`
+    const preset: Preset = { id: uid('preset'), name, settings: { ...settings } }
+    await savePreset(preset)
+    setPresets(await listPresets())
+    setActivePresetId(preset.id)
+    setCustomName('')
+    setStatus(`Saved preset “${name}”`)
+  }
+
+
+  const clearStage = () => {
+    if (stagedRef.current?.previewUrl) URL.revokeObjectURL(stagedRef.current.previewUrl)
+    stagedRef.current = null
+    setStaged(null)
+  }
+  const stageBounce = (note: string, blob: Blob, apply: () => Promise<void>) => {
+    clearStage()
+    const previewUrl = URL.createObjectURL(blob)
+    const next = {
+      note,
+      previewUrl,
+      apply: async () => {
+        await apply()
+        clearStage()
+      },
+    }
+    stagedRef.current = next
+    setStaged(next)
+    setStatus(note)
+  }
+
+  const persistAsWavTake = async (opts: {
+    name: string
+    blob: Blob
+    kind: 'dry' | 'infected' | 'mix' | 'master' | 'pass'
+    offsetSec?: number
+  }) => {
+    let buf = await blobToAudioBuffer(opts.blob)
+    const compensationSec = Math.max(-0.2, Math.min(0.2, compensationMs / 1000))
+    if (compensationSec) buf = shiftAudioBuffer(buf, -compensationSec)
+    if (opts.offsetSec) buf = shiftAudioBuffer(buf, opts.offsetSec)
+    const rendered = await exportMasterWav(buf, exportTier)
+    return saveTake({ name: opts.name, blob: rendered.blob, kind: opts.kind, offsetSec: opts.offsetSec })
+  }
+
+  const processOfflineFile = async (file: File) => {
+    if (!engineRef.current) {
+      engineRef.current = new InfectedAudioEngine(settings)
+      await engineRef.current.init()
+    }
+    const buf = await blobToAudioBuffer(file)
+    vocalBufRef.current = buf
+    const processed = await engineRef.current.processOfflineBuffer(buf)
+    const wav = (await exportMasterWav(processed, exportTier)).blob
+    stageBounce(`Tune preview is ready for ${file.name}. Preview, then Keep. Cancel leaves the original file out of the project.`, wav, async () => {
+      await saveTake({ name: `Offline ${file.name}`, blob: wav, kind: 'infected' })
+      setTakes(await listTakes())
+      setStatus(`Tune kept: ${file.name}. The original file was not replaced.`)
+    })
+  }
+
+  const runPocketAssist = async (takeId: string) => {
+    const take = takes.find((t) => t.id === takeId)
+    if (!take) return
+    const buf = await blobToAudioBuffer(take.blob)
+    const offset = pocketAssistOffsetSec(buf.getChannelData(0), buf.sampleRate, bpm)
+    const shifted = shiftAudioBuffer(buf, offset)
+    const wav = (await exportMasterWav(shifted, exportTier)).blob
+    stageBounce(`Timing preview is ready. ${ (offset * 1000).toFixed(1) } ms, inside ±${POCKET_LIMIT_SEC * 1000} ms. Preview, then Keep.`, wav, async () => {
+      await saveTake({
+        name: `${take.name} (pocket ${(offset * 1000).toFixed(0)}ms)`,
+        blob: wav,
+        kind: take.kind,
+        offsetSec: offset,
+      })
+      setTakes(await listTakes())
+      setStatus(`Timing kept at ${(offset * 1000).toFixed(1)} ms. The original take is unchanged.`)
+    })
+  }
+
+  const runManualPocket = async (takeId: string) => {
+    const take = takes.find((t) => t.id === takeId)
+    if (!take) return
+    const offset = clampPocketSec(pocketMs / 1000)
+    const buf = await blobToAudioBuffer(take.blob)
+    const shifted = shiftAudioBuffer(buf, offset)
+    const wav = (await exportMasterWav(shifted, exportTier)).blob
+    stageBounce(`Timing preview is ready. Nudge ${(offset * 1000).toFixed(0)} ms, clamped to ±80 ms. Preview, then Keep.`, wav, async () => {
+      await saveTake({
+        name: `${take.name} (nudge ${(offset * 1000).toFixed(0)}ms)`,
+        blob: wav,
+        kind: take.kind,
+        offsetSec: offset,
+      })
+      setTakes(await listTakes())
+      setStatus(`Timing kept at ${(offset * 1000).toFixed(0)} ms. The original take is unchanged.`)
+    })
+  }
+
+  const runSmartMix = async () => {
+    if (!canUseSmartMix(entitlements)) {
+      setStatus('Smart Mix + Master is included in Pro $40.')
+      showPlan()
+      return
+    }
+    if (!beatBuf) {
+      setStatus('Import a beat first')
+      return
+    }
+    const vocalTake = takes.find((t) => t.kind === 'infected' || t.kind === 'pass')
+    if (!vocalTake) {
+      setStatus('Record or process a vocal first')
+      return
+    }
+    setStatus('SMART MIX+MASTER rendering…')
+    let vocal = await blobToAudioBuffer(vocalTake.blob)
+    if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
+    const mastered = await smartMixMaster(vocal, beatBuf)
+    const rendered = await exportMasterWav(mastered, exportTier)
+    stageBounce('Mix preview is ready. Vocal balanced, beat ducked, bus limited. Preview, then Keep. This is not an AI master.', rendered.blob, async () => {
+      await saveTake({ name: `SMART MIX+MASTER ${new Date().toLocaleTimeString()}`, blob: rendered.blob, kind: 'master' })
+      setTakes(await listTakes())
+      setStatus('Smart Mix + Master kept. The source takes are unchanged.')
+    })
+  }
+
+  const runMicMaster = async () => {
+    if (!beatBuf) {
+      setStatus('Import a beat first')
+      return
+    }
+    const vocalTake = takes.find((t) => t.kind === 'infected' || t.kind === 'pass')
+    if (!vocalTake) {
+      setStatus('Record or process a vocal first')
+      return
+    }
+    setStatus('Ultimate Mic Master rendering…')
+    let vocal = await blobToAudioBuffer(vocalTake.blob)
+    if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
+    const mastered = await micMasterMix(vocal, beatBuf)
+    const wav = (await exportMasterWav(mastered, exportTier)).blob
+    stageBounce('Gentle bus preview is ready. Preview, then Keep. The limiter is not slammed.', wav, async () => {
+      await saveTake({ name: `Mic Master ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
+      setTakes(await listTakes())
+      setStatus('Gentle bus kept. Source takes are unchanged.')
+    })
+  }
+
+  const runUltimateMaster = async () => {
+    if (!beatBuf) {
+      setStatus('Import a beat first')
+      return
+    }
+    const vocalTake = takes.find((t) => t.kind === 'infected' || t.kind === 'pass')
+    if (!vocalTake) {
+      setStatus('Record or process a vocal first')
+      return
+    }
+    setStatus('Ultimate Mic Master rendering…')
+    let vocal = await blobToAudioBuffer(vocalTake.blob)
+    if (vocalTake.offsetSec) vocal = shiftAudioBuffer(vocal, vocalTake.offsetSec)
+    const mastered = await ultimateMicMaster(vocal, beatBuf, master)
+    const wav = (await exportMasterWav(mastered, exportTier)).blob
+    stageBounce('Master preview is ready. Preview, then Keep. No finished master is written until Keep.', wav, async () => {
+      await saveTake({ name: `Ultimate Mic Master ${new Date().toLocaleTimeString()}`, blob: wav, kind: 'master' })
+      setTakes(await listTakes())
+      setStatus('Master kept. Source takes are unchanged.')
+    })
+  }
+
+  const balanceMix = async () => {
+    undoMaster.current = { settings: { ...settings }, master: { ...master } }
+    if (correctOnBalance && settings.correction < 70) patchSettings({ correction: 70 })
+    const vocalTake = takes.find((t) => t.kind === 'infected' || t.kind === 'pass')
+    if (vocalTake && beatBuf) {
+      const vocal = await blobToAudioBuffer(vocalTake.blob)
+      const vocalRms = Math.sqrt(vocal.getChannelData(0).reduce((sum, sample) => sum + sample * sample, 0) / vocal.length)
