@@ -148,8 +148,8 @@
     setStatus(`Beat loaded: ${file.name}`)
   }
 
-  const applyLoop = () => {
-    engineRef.current?.setLoop(loopOn, loopStart, loopEnd)
+  const applyLoop = (on: boolean = loopOn) => {
+    engineRef.current?.setLoop(on, loopStart, loopEnd)
     void saveProject({ loopStartSec: loopStart, loopEndSec: loopEnd, bpm })
   }
 

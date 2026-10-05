@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { InfectedAudioEngine, pocketAssistOffsetSec, rapOnBeatRate } from './lib/audioEngine'
+import { PITCH_ERROR_EVENT } from './lib/pitchShifter'
 import {
   KEYS,
   defaultSettings,
@@ -131,6 +132,7 @@ export default function App() {
   const [bpm, setBpm] = useState(140)
   const [pos, setPos] = useState(0)
   const [loopOn, setLoopOn] = useState(false)
+  const [pitchError, setPitchError] = useState<string | null>(null)
   const [loopStart, setLoopStart] = useState(0)
   const [loopEnd, setLoopEnd] = useState(8)
   const [loopStartBar, setLoopStartBar] = useState(1)
@@ -205,6 +207,12 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    const onPitchError = (e: Event) => setPitchError(String((e as CustomEvent<string>).detail || 'Pitch shifter failed'))
+    window.addEventListener(PITCH_ERROR_EVENT, onPitchError)
+    return () => window.removeEventListener(PITCH_ERROR_EVENT, onPitchError)
+  }, [])
 
   useEffect(() => {
     if (!engineOn) {
