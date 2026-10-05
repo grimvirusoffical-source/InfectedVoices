@@ -77,6 +77,52 @@ const midHz = (semitones) => IN_HZ * Math.pow(2, semitones / 12)
 /** Analysis window that skips the first second (retune slew, recorder start). */
 const win = (w) => ({ start: Math.min(w.n - 1, Math.round(w.sr * 1.0)), len: Math.max(1, Math.min(w.n - Math.round(w.sr * 1.0), w.sr * 2)) })
 
+// <click-detector>
+/**
+ * Click detector for a steady tone around known event times (seconds from the start of `x`).
+ * For each event it compares a window around the event with steady-state windows BEFORE and AFTER it,
+ * so a legitimate change of steady state (GRIM's pitch drop, darker tone) is part of the baseline, not a click.
+ *  - hfRatio:    loudest 5 ms window of >8 kHz energy near the event / 95th-percentile 5 ms >8 kHz level
+ *                in the steadier-but-louder of the pre/post states (floored at -60 dB re signal RMS).
+ *  - deltaRatio: max |x[n]-x[n-1]| near the event / max |x[n]-x[n-1]| in the pre/post steady states.
+ * Windows: `near` spans -100..+300 ms because the audible change lands ~100 ms after the UI click (UI -> engine ->
+ * capture block timestamps); `pre`/`post` steady states sit 200 ms before and 450–850 ms after (toggles are 1.2 s apart).
+ * Band: >8 kHz, not >4 kHz — the studio chain's saturation puts harmonics of the tone in 4–8 kHz, which masked
+ * real toggle clicks in captures from the SoundTouch build (4 kHz: 1.2–8x; 8 kHz: 2–13x on the same toggles).
+ * Thresholds (hf 3x ≈ +9.5 dB, delta 3x), from synthetic GRIM-like signals (tone + saturation + -70 dB noise):
+ * hard switch scores 7.9–30x (hf) / 3.6–9.2x (delta); 10, 15 and 20 ms equal-power crossfades score <=0.8x / <=1.4x,
+ * so 3x sits ~2.6x clear of both sides on the hf metric; a phase-continuous pitch glide scores 0.7x / 1.0x.
+ */
+function detectClicks(x, sr, events, { pre = [0.6, 0.2], post = [0.45, 0.85], near = [0.1, 0.3], hfMax = 3, deltaMax = 3, hpHz = 8000 } = {}) {
+  // High-pass at hpHz: two cascaded 2nd-order Butterworth sections (RBJ biquad, Q = 0.7071).
+  const hp = (inp) => {
+    const w = 2 * Math.PI * hpHz / sr, al = Math.sin(w) / (2 * Math.SQRT1_2), c = Math.cos(w), a0 = 1 + al
+    const b0 = (1 + c) / 2 / a0, b1 = -(1 + c) / a0, b2 = b0, a1 = -2 * c / a0, a2 = (1 - al) / a0
+    let out = inp
+    for (let k = 0; k < 2; k++) {
+      const y = new Float32Array(out.length); let x1 = 0, x2 = 0, y1 = 0, y2 = 0
+      for (let i = 0; i < out.length; i++) { const v = b0 * out[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = out[i]; y2 = y1; y1 = v; y[i] = v }
+      out = y
+    }
+    return out
+  }
+  const h = hp(x), win = Math.round(sr * 0.005)
+  const idx = (t) => Math.max(0, Math.min(x.length, Math.round(t * sr)))
+  const hfWindows = (a, b) => { const o = []; for (let i = idx(a); i + win <= idx(b); i += win) { let e = 0; for (let j = i; j < i + win; j++) e += h[j] * h[j]; o.push(Math.sqrt(e / win)) } return o }
+  const maxDelta = (a, b) => { let m = 0; for (let i = Math.max(1, idx(a)); i < idx(b); i++) { const d = Math.abs(x[i] - x[i - 1]); if (d > m) m = d } return m }
+  const p95 = (v) => { const s = [...v].sort((p, q) => p - q); return s.length ? s[Math.floor(0.95 * (s.length - 1))] : 0 }
+  let sig = 0; for (let i = 0; i < x.length; i++) sig += x[i] * x[i]; sig = Math.sqrt(sig / Math.max(1, x.length))
+  return events.map((t) => {
+    const hfBase = Math.max(p95(hfWindows(t - pre[0], t - pre[1])), p95(hfWindows(t + post[0], t + post[1])), 1e-3 * sig)
+    const nearHf = hfWindows(t - near[0], t + near[1]); const hfPeak = nearHf.length ? Math.max(...nearHf) : 0
+    const dBase = Math.max(maxDelta(t - pre[0], t - pre[1]), maxDelta(t + post[0], t + post[1]), 1e-6)
+    const dPeak = maxDelta(t - near[0], t + near[1])
+    const hfRatio = hfPeak / hfBase, deltaRatio = dPeak / dBase
+    return { t, hfRatio, deltaRatio, click: hfRatio > hfMax || deltaRatio > deltaMax }
+  })
+}
+// </click-detector>
+
 // ---------- static server for the built payload ----------
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json' }
 const servers = []
@@ -136,8 +182,8 @@ const LATENCY_PROBE = () => {
   const tapFor = (ctx) => {
     if (taps.has(ctx)) return taps.get(ctx)
     const merger = ctx.createChannelMerger(2), sp = ctx.createScriptProcessor(2048, 2, 2)
-    const store = { sr: ctx.sampleRate, on: false, a: [], b: [] }
-    sp.onaudioprocess = (e) => { if (store.on) { store.a.push(new Float32Array(e.inputBuffer.getChannelData(0))); store.b.push(new Float32Array(e.inputBuffer.getChannelData(1))) } }
+    const store = { sr: ctx.sampleRate, ctx, on: false, t0: null, a: [], b: [] }
+    sp.onaudioprocess = (e) => { if (store.on) { if (store.t0 === null) store.t0 = e.playbackTime; store.a.push(new Float32Array(e.inputBuffer.getChannelData(0))); store.b.push(new Float32Array(e.inputBuffer.getChannelData(1))) } }
     oc.call(merger, sp); oc.call(sp, ctx.destination)
     window.__ivProbe = store; const t = { merger, mic: new WeakSet(), out: new WeakSet() }; taps.set(ctx, t); return t
   }
@@ -443,3 +489,44 @@ for (const [mode, how] of [
     } finally { await s.ctx.close() }
   })
 }
+
+test('[#14 Avery] toggling GRIM mid-take does not click (10–20 ms crossfade expected)', async () => {
+  requireEngine()
+  // Steady 440 Hz fake mic (main browser). The probe taps the exact signal fed to the recorder, sample-aligned and before
+  // Opus encoding (which would smear a click), and timestamps it on the AudioContext clock used to time each toggle.
+  const s = await openStudio({ probe: true })
+  try {
+    await s.configure({ key: 'A', scale: 'major', correction: 0, grimOn: false, depth: 50, darkness: 70 })
+    await s.tab('Studio'); await s.click('Start engine'); await s.wait(2500)
+    assert.match(await s.status(), /^Engine live/, `click check: engine did not start. Status: "${await s.status()}"`)
+    await s.page.evaluate(() => { const p = window.__ivProbe; if (p) { p.a = []; p.b = []; p.t0 = null; p.on = true } })
+    await s.click('Record take')
+    await s.tab('Deep Settings'); await s.wait(1500)
+    const toggles = []
+    for (let k = 0; k < 4; k++) {
+      // Click the real GRIM control in the page and read the engine clock in the same task.
+      const r = await s.page.evaluate(() => {
+        const b = [...document.querySelectorAll('button')].find((e) => /^GRIM (ON|OFF)$/.test(e.textContent.trim()))
+        if (!b || !window.__ivProbe) return null
+        const before = b.textContent.trim(); b.click(); return { t: window.__ivProbe.ctx.currentTime, before }
+      })
+      assert.ok(r, 'click check: GRIM button or audio probe not found')
+      toggles.push(r); await s.wait(1200)
+    }
+    await s.tab('Studio'); await s.click('Stop take')
+    const cap = await s.page.evaluate(() => {
+      const p = window.__ivProbe; p.on = false
+      const n = p.b.reduce((k, c) => k + c.length, 0), o = new Float32Array(n); let j = 0; for (const c of p.b) { o.set(c, j); j += c.length }
+      return { sr: p.sr, t0: p.t0, b: Array.from(o) }
+    })
+    const states = toggles.map((r) => r.before)
+    assert.deepEqual(states, ['GRIM OFF', 'GRIM ON', 'GRIM OFF', 'GRIM ON'], `GRIM button did not alternate as expected: ${states.join(' -> ')}`)
+    assert.ok(cap.t0 !== null && cap.b.length > cap.sr * 4, 'click check: probe captured too little audio')
+    const x = Float32Array.from(cap.b)
+    assert.ok(rms(x) > 0.005, `click check: recorder input is silent (rms ${rms(x).toFixed(5)})`)
+    const res = detectClicks(x, cap.sr, toggles.map((r) => r.t - cap.t0))
+    const bad = res.filter((r) => r.click)
+    const fmt = (r, i) => `toggle ${i + 1} (${states[i] === 'GRIM OFF' ? 'OFF->ON' : 'ON->OFF'}) at ${r.t.toFixed(3)} s: HF>8kHz ${r.hfRatio.toFixed(1)}x baseline, max sample delta ${r.deltaRatio.toFixed(1)}x baseline`
+    assert.equal(bad.length, 0, `Click on GRIM toggle (limits: >8 kHz energy 3x, max sample delta 3x vs the steady state before/after):\n  ${res.map(fmt).filter((_, i) => res[i].click).join('\n  ')}\nAll toggles:\n  ${res.map(fmt).join('\n  ')}`)
+  } finally { await s.ctx.close() }
+})
