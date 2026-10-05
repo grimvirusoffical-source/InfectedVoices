@@ -1,6 +1,12 @@
 import * as Tone from 'tone'
-import { BungeePitchShift } from 'bungee-pitch-shift'
-import { OfflineProcessor } from 'bungee-pitch-shift/worker'
+import {
+  PitchShiftError,
+  RealtimePitchShifter,
+  renderPitchSchedule,
+  reportPitchError,
+  stretchToDuration,
+  type PitchPoint,
+} from './pitchShifter'
 import type { VocalSettings } from './presets'
 import { snapSemitones, yinDetect } from './pitchMath'
 
@@ -35,8 +41,10 @@ export class InfectedAudioEngine {
   private metroLoop?: Tone.Loop
   private recorder?: Tone.Recorder
   private settings: VocalSettings
-  private correct?: BungeePitchShift
-  private grimShift?: BungeePitchShift
+  private correct?: RealtimePitchShifter
+  private grimShift?: RealtimePitchShifter
+  /** Last pitch-shifter failure; also broadcast as `iv-pitch-error` for the studio banner. */
+  pitchError: string | null = null
   private analyser?: AnalyserNode
   private analyseBuf?: Float32Array
   private targetPitch = 0
@@ -51,9 +59,18 @@ export class InfectedAudioEngine {
   }
 
   async init() {
+    // Give Tone a *native* AudioContext. Tone's default standardized-audio-context wrapper re-wraps
+    // AudioWorklet modules as classic scripts, so the ES-module pitch worklet died with
+    // "Unexpected token 'export'" and Start engine never reached "Engine live".
+    const current = Tone.getContext().rawContext
+    if (!(current instanceof AudioContext) || current.state === 'closed') {
+      this.nativeCtx = new AudioContext({ latencyHint: 'interactive' })
+      Tone.setContext(new Tone.Context(this.nativeCtx))
+    } else {
+      this.nativeCtx = current
+    }
     await Tone.start()
     const toneCtx = Tone.getContext()
-    this.nativeCtx = toneCtx.rawContext as AudioContext
 
     this.micGain = new Tone.Gain(1)
     this.wetGain = new Tone.Gain(1)
@@ -78,19 +95,20 @@ export class InfectedAudioEngine {
       envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 },
     })
 
-    // Bungee: detect→snap correction + optional GRIM dual low-shift
-    this.correct = await BungeePitchShift.create(this.nativeCtx, {
-      workletPath: publicAsset('bungee-processor-bundled.js'),
-      initialPitch: 0,
-      initialSpeed: 1,
-      initialMix: 0.85,
-    })
-    this.grimShift = await BungeePitchShift.create(this.nativeCtx, {
-      workletPath: publicAsset('bungee-processor-bundled.js'),
-      initialPitch: 0,
-      initialSpeed: 1,
-      initialMix: 0,
-    })
+    // Bungee: detect→snap correction + optional GRIM dual low-shift.
+    // If the shifter can't start, the engine still runs (mic, record, metronome) with the chain
+    // bypassed, and the failure is surfaced, never hidden.
+    try {
+      this.correct = await RealtimePitchShifter.create(this.nativeCtx, { pitch: 0, speed: 1, mix: 0.85 })
+      this.grimShift = await RealtimePitchShifter.create(this.nativeCtx, { pitch: 0, speed: 1, mix: 0 })
+      this.correct.onError((m) => this.setPitchError(m))
+      this.grimShift.onError((m) => this.setPitchError(m))
+    } catch (e) {
+      this.correct?.dispose()
+      this.correct = undefined
+      this.grimShift = undefined
+      this.setPitchError(e instanceof Error ? e.message : String(e))
+    }
 
     this.analyser = this.nativeCtx.createAnalyser()
     this.analyser.fftSize = 2048
@@ -100,10 +118,14 @@ export class InfectedAudioEngine {
     this.micGain.connect(this.gate)
     const tap = new Tone.Gain(1)
     this.gate.connect(tap)
-    Tone.connect(tap, this.correct.node)
-    this.correct.node.connect(this.grimShift.node)
     const fromNative = new Tone.Gain(1)
-    this.grimShift.node.connect(fromNative.input)
+    if (this.correct && this.grimShift) {
+      Tone.connect(tap, this.correct.node)
+      this.correct.node.connect(this.grimShift.node)
+      this.grimShift.node.connect(fromNative.input)
+    } else {
+      tap.connect(fromNative)
+    }
     fromNative.connect(this.darkFilter!)
     this.darkFilter!.connect(this.warmthEq!)
     this.warmthEq!.connect(this.deessFilter!)
@@ -140,6 +162,18 @@ export class InfectedAudioEngine {
     this.ready = true
     this.tick()
     return toneCtx
+  }
+
+  private setPitchError(message: string) {
+    if (this.pitchError === message) return
+    this.pitchError = message
+    reportPitchError(message)
+  }
+
+  /** Test hook: make the live shifter fail so the UI error path can be checked. */
+  forcePitchFailure(message?: string) {
+    if (this.correct) this.correct.forceFail(message)
+    else this.setPitchError(message ?? 'Pitch shifter forced to fail (test hook)')
   }
 
   private tick = () => {
@@ -205,15 +239,17 @@ export class InfectedAudioEngine {
       : 2000 + (1 - s.darkness / 100) * 16000
     this.darkFilter.frequency.rampTo(darkHz, 0.05)
     this.warmthEq!.frequency.value = 220
-    this.warmthEq!.gain.rampTo((s.warmth / 100) * 8, 0.05)
-    this.deessFilter!.gain.rampTo(-(s.deess / 100) * 12, 0.05)
+    // Filter gain and compressor threshold are dB params: Tone's rampTo picks an exponential ramp for dB, which
+    // yields NaN once a value crosses 0 dB (e.g. de-ess 0 → −3.4 dB) and threw on Start engine. Ramp them linearly.
+    this.warmthEq!.gain.linearRampTo((s.warmth / 100) * 8, 0.05)
+    this.deessFilter!.gain.linearRampTo(-(s.deess / 100) * 12, 0.05)
     this.glitchDelay!.wet.rampTo(s.grimOn ? (s.glitch / 100) * 0.55 : (s.glitch / 100) * 0.2, 0.05)
     this.glitchDelay!.feedback.rampTo(0.15 + (s.glitch / 100) * 0.45, 0.05)
     this.grit!.distortion = Math.min(0.85, (s.grit / 100) * 0.7 + (s.grimOn ? 0.1 : 0))
     this.echo!.wet.rampTo(s.echo / 100, 0.05)
     this.echo!.feedback.rampTo(0.05 + (s.echo / 100) * 0.35, 0.05)
     this.space!.wet.rampTo((s.space / 100) * (s.acapella ? 0.55 : 0.35), 0.08)
-    this.compressor!.threshold.rampTo(-12 - (s.compress / 100) * 18, 0.05)
+    this.compressor!.threshold.linearRampTo(-12 - (s.compress / 100) * 18, 0.05)
     this.compressor!.ratio.value = 2 + (s.compress / 100) * 6
     this.gate!.threshold = -60 + (s.gate / 100) * 40
     const outLin = Math.pow(10, s.outputDb / 20)
@@ -322,13 +358,9 @@ export class InfectedAudioEngine {
     Tone.getTransport().seconds = Math.max(0, sec)
   }
 
-  /** Offline: frame-wise YIN→snap via Bungee segments + GRIM FX bounce */
+  /** Offline: frame-wise YIN→snap pitch schedule rendered in one main-thread pass + GRIM FX bounce */
   async processOfflineBuffer(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
     const s = this.settings
-    const offline = new OfflineProcessor({
-      workerPath: publicAsset('audio-processor.worker.bundle.js'),
-      workletPath: publicAsset('bungee-processor-bundled.js'),
-    })
     const sr = audioBuffer.sampleRate
     const ch0 = audioBuffer.getChannelData(0)
     const frame = Math.floor(sr * 0.12) // ~120ms windows
@@ -336,38 +368,23 @@ export class InfectedAudioEngine {
     const mix = Math.max(0, Math.min(1, Number.isFinite(s.correction) ? s.correction / 100 : 0))
     const grim = s.grimOn ? -(s.depth / 100) * 7 : 0
     const formant = (s.formant / 100) * 2
-    const parts: AudioBuffer[] = []
-
-    try {
+    const channels = audioBuffer.numberOfChannels
+    let joined = audioBuffer
+    if (mix > 0) {
+      // One schedule point per ~120 ms window; the worklet applies it at that exact frame.
+      const schedule: PitchPoint[] = []
       for (let i = 0; i < ch0.length; i += hop) {
         const len = Math.min(frame, ch0.length - i)
-        const slice = new AudioBuffer({
-          length: len,
-          numberOfChannels: audioBuffer.numberOfChannels,
-          sampleRate: sr,
-        })
-        for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
-          slice.getChannelData(c).set(audioBuffer.getChannelData(c).subarray(i, i + len))
-        }
-        // Preserve very short takes and the final partial frame instead of dropping them.
-        if (len < 256 || mix === 0) { parts.push(slice); continue }
-        const hz = yinDetect(slice.getChannelData(0), sr)
-        const snap = snapSemitones(hz, s.key, s.scale, 8)
-        const pitch = (snap ?? 0) + grim * 0.4 + formant
-        const shifted = await offline.process(slice, { pitch, speed: 1, mix })
-        parts.push(shifted)
+        const snap = len >= 256 ? snapSemitones(yinDetect(ch0.subarray(i, i + len), sr), s.key, s.scale, 8) : null
+        schedule.push({ atSec: i / sr, semitones: (snap ?? 0) + grim * 0.4 + formant })
       }
-    } finally { offline.dispose?.() }
-
-    const total = parts.reduce((n, b) => n + b.length, 0) || audioBuffer.length
-    const channels = audioBuffer.numberOfChannels
-    const joined = new AudioBuffer({ length: total, numberOfChannels: channels, sampleRate: sr })
-    let writeAt = 0
-    for (const part of parts) {
-      for (let c = 0; c < channels; c++) {
-        joined.getChannelData(c).set(part.getChannelData(Math.min(c, part.numberOfChannels - 1)), writeAt)
+      try {
+        joined = await renderPitchSchedule(audioBuffer, schedule, mix)
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        this.setPitchError(message)
+        throw e instanceof PitchShiftError ? e : new PitchShiftError(message)
       }
-      writeAt += part.length
     }
 
     const ox = new OfflineAudioContext(channels, joined.length, sr)
@@ -429,15 +446,15 @@ export class InfectedAudioEngine {
     return 20 * Math.log10(peak)
   }
 
-  /** Stretch a recorded buffer to target duration (pitch-preserving Bungee) */
+  /** Stretch a recorded buffer to target duration (pitch-preserving: resample + pitch compensation) */
   async stretchBufferToDuration(audioBuffer: AudioBuffer, targetSec: number): Promise<AudioBuffer> {
-    const speed = Math.min(2, Math.max(0.5, audioBuffer.duration / Math.max(0.05, targetSec)))
-    const offline = new OfflineProcessor({
-      workerPath: publicAsset('audio-processor.worker.bundle.js'),
-      workletPath: publicAsset('bungee-processor-bundled.js'),
-    })
-    try { return await offline.process(audioBuffer, { pitch: 0, speed, mix: 1 }) }
-    finally { offline.dispose?.() }
+    try {
+      return await stretchToDuration(audioBuffer, targetSec)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      this.setPitchError(message)
+      throw e instanceof PitchShiftError ? e : new PitchShiftError(message)
+    }
   }
 }
 
