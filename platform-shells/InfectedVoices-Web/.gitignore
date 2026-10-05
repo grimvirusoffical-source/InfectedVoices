@@ -1,0 +1,15 @@
+node_modules/
+payload/
+site/voices/
+site/get/
+site/download/
+dist/
+browser-dist/
+.secrets/
+*.ipa
+*.aab
+*.apk
+*.exe
+*.msi
+*.dmg
+*.app

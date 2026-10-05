@@ -1,0 +1,15 @@
+{
+  "name": "infectedvoices-windows",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Thin Windows packaging hook for Infected Voices. Installer signing is a placeholder.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test scripts/self-check.test.mjs",
+    "check": "node scripts/stage-windows-payload.mjs --check",
+    "stage": "node scripts/stage-windows-payload.mjs --build"
+  }
+}

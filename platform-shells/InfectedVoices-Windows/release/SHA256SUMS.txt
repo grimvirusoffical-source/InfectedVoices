@@ -1,0 +1,7 @@
+# Infected Voices Windows installer
+# status: placeholder
+# signed: not yet. Authenticode is not applied in this commit.
+# A real Release replaces this file with one line:
+# <64 lowercase hex SHA-256>  <installer file name>
+# The GitHub source zipball is source, not the Windows app.
+UNPROVISIONED  no-installer
