@@ -22,6 +22,8 @@ jobs:
           node-version: '22'
       - name: Install pinned dependencies
         run: npm ci --ignore-scripts
+      - name: Install studio dependencies (SoundTouch + worklets)
+        run: npm ci --prefix studio
       - name: Run Core unit tests
         run: npm test
       - name: Validate complete mobile payload
