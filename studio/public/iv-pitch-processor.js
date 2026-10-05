@@ -9,14 +9,16 @@
 // Two voices share one input:
 //   main = input shifted by `pitch` (auto-tune correction, plus the GRIM bias)
 //   sub  = input shifted by `pitch·mix + subOffset` (GRIM pitch drop: it follows the main path, so with correction
-//          at 0 it drops the dry voice), blended in with `subGain`
-//   out  = (dry·(1−mix) + main·mix)·(1−subGain) + sub·subGain
+//          at 0 it drops the dry voice)
+//   out  = (dry·(1−mix) + main·mix)·(1−g) + sub·√(1−(1−g)²), g = subGain = GRIM Mix (0–1 wet, equal-power; at 1 the
+//          lowered voice replaces the dry voice)
 // Each voice is SoundTouch's own Stretch → RateTransposer pipes, composed in stretch-first order (the SoundTouch
 // class transposes first when pitching down, which smears deep drops). The library itself is untouched.
 //
 // Latency (live): WSOLA has to hold `sequence + seek window` of input before it can emit audio, and a bit more
 // when pitching down. Each voice keeps the smallest delay that covers its current shift. The delay rises at once
-// (a few ms of silence) and falls back after 0.5 s.
+// and falls back after 0.5 s; each change is an equal-power crossfade (XFADE_MS) between the old and new read
+// positions in the voice's output ring, so it never inserts silence or clicks.
 // Two WSOLA tiers, both measured on harmonic tones from 85 to 800 Hz:
 //   full [20, 14, 10] ms: clean for every voice, ~38 ms
 //   fast [14, 10, 6] ms:  clean only above ~150 Hz, ~27 ms
@@ -38,6 +40,10 @@ const MARGIN = 128 // one render quantum
 const DEADBAND = 96 // frames of delay error tolerated before padding/dropping
 const FAST_ON_HZ = 165
 const FAST_OFF_HZ = 145
+let XFADE_MS = 15 // default equal-power crossfade (GRIM_CROSSFADE_MS in pitchShifter.ts; overridden by processorOptions.crossfadeMs, clamped to 10–20 ms)
+const RING = 32768 // frames of voice output kept for splices (~0.68 s at 48 kHz)
+const ALIGN = 240 // frames searched (toward more delay only) to line a splice up with the audio just played
+const MATCH = 256 // frames compared for that alignment
 
 function num(v, fallback) {
   v = Number(v)
@@ -56,6 +62,15 @@ class Voice {
     this.consumed = 0
     this.lowFor = 0
     this.underrunFrames = 0
+    this.ring = new Float32Array(RING * 2)
+    this.tmp = new Float32Array(4096)
+    this.written = 0
+    this.xLen = Math.round((XFADE_MS / 1000) * sampleRate)
+    this.xLeft = 0
+    this.xCur = 1
+    this.xFrom = 0
+    this.splices = 0
+    this.bias = 0
     this.configure(tier)
     this.set(0)
     this.target = adaptive ? this.delayFor(0) : this.delayFor(-maxDown)
@@ -96,39 +111,138 @@ class Voice {
       }
     } else this.lowFor = 0
   }
-  /** Push n interleaved frames, then write n frames to `out` that sit `target` frames behind the input. */
+  /**
+   * Push n interleaved frames, then write n frames to `out` that sit `target` frames behind the input.
+   * SoundTouch output is copied into a ring so a delay change never inserts silence or drops content abruptly:
+   * the read position jumps by the change (forward when the delay shrinks, back, i.e. a short repeat, when it
+   * grows) and the old and new positions are crossfaded with equal-power curves over XFADE_MS.
+   */
   process(input, out, n, inFrames) {
     this.stretch.inputBuffer.putSamples(input, 0, n)
     this.stretch.process()
     if (this.transposer.inputBuffer.frameCount > 0) this.transposer.process()
+    this.pull()
     out.fill(0, 0, n * 2)
     if (inFrames < this.target) return 0
-    const fifo = this.fifo
-    // Content we should have consumed after this block to sit exactly `target` behind the input.
-    let need = inFrames - this.target - this.consumed
-    if (need > n + DEADBAND) {
-      // Behind (delay shrank, or recovering from an underrun): skip content.
-      const drop = Math.min(need - n, fifo.frameCount)
-      if (drop > 0) {
-        fifo.receive(drop)
-        this.consumed += drop
+    const need = inFrames - this.target - this.consumed + this.bias
+    if (this.xLeft === 0 && (need > n + DEADBAND || need < n - DEADBAND)) this.splice(this.consumed + need - this.bias - n)
+    else if (this.bias !== 0 && this.xLeft === 0) this.dropBiasIfSilent(n)
+    const ring = this.ring
+    const w = this.written
+    let r = this.consumed
+    let got = 0
+    for (let i = 0; i < n; i++, r++) {
+      let l = 0
+      let rr = 0
+      if (r < w) {
+        const k = (r % RING) * 2
+        l = ring[k]
+        rr = ring[k + 1]
+        got++
       }
-      need = inFrames - this.target - this.consumed
+      if (this.xLeft > 0) {
+        const t = 1 - this.xLeft / this.xCur
+        const gNew = Math.sin(t * Math.PI * 0.5)
+        const gOld = Math.cos(t * Math.PI * 0.5)
+        const f = this.xFrom
+        let ol = 0
+        let or = 0
+        if (f < w) {
+          const k = (f % RING) * 2
+          ol = ring[k]
+          or = ring[k + 1]
+        }
+        l = l * gNew + ol * gOld
+        rr = rr * gNew + or * gOld
+        this.xFrom = f + 1
+        this.xLeft--
+      }
+      out[i * 2] = l
+      out[i * 2 + 1] = rr
     }
-    let pad = 0
-    let read = n
-    if (need < n - DEADBAND) {
-      // Ahead (delay grew): emit a little silence instead of content.
-      read = Math.max(0, need)
-      pad = n - read
+    // Don't run ahead of the data: an underrun holds the position, and the catch-up splice fades back in.
+    this.consumed = Math.min(r, w)
+    if (got < n) this.underrunFrames += n - got
+    return got
+  }
+  /**
+   * Jump the read position to (about) `q`. The exact spot is picked within ±ALIGN frames so the audio that follows
+   * it lines up with what was just played (normalised cross-correlation over the last MATCH frames, like WSOLA's
+   * own seek; only toward more delay, never less), then old and new positions are crossfaded equal-power over
+   * XFADE_MS, or over whatever old content is still available when the delay is growing. The small leftover offset
+   * (at most ALIGN frames of extra delay) is kept in `bias` so it isn't re-spliced.
+   */
+  splice(q) {
+    const r = this.consumed
+    const w = this.written
+    const ring = this.ring
+    const oldest = w - RING + this.xLen + 256
+    let best = Math.max(oldest, Math.min(w, Math.round(q)))
+    if (r >= MATCH) {
+      let bestScore = -Infinity
+      const lo = Math.max(oldest + MATCH, Math.round(q) - ALIGN)
+      const hi = Math.min(w, Math.round(q)) // never less delay than the target: no extra underrun risk
+      const minMove = Math.abs(q - r) / 2
+      for (let p = lo; p <= hi; p++) {
+        if (Math.abs(p - r) < minMove) continue
+        let xy = 0
+        let yy = 0
+        for (let j = 1; j <= MATCH; j += 2) {
+          const a = ((r - j) % RING) * 2
+          const b = ((p - j) % RING) * 2
+          const x = ring[a] + ring[a + 1]
+          const y = ring[b] + ring[b + 1]
+          xy += x * y
+          yy += y * y
+        }
+        const score = xy / Math.sqrt(yy + 1e-9)
+        if (score > bestScore) {
+          bestScore = score
+          best = p
+        }
+      }
     }
-    read = Math.min(read, fifo.frameCount)
-    if (read > 0) {
-      fifo.receiveSamples(out.subarray(pad * 2), read)
-      this.consumed += read
+    if (best === r) return
+    this.bias = best - Math.round(q)
+    this.xFrom = r
+    this.consumed = best
+    // Crossfade only over old content that exists; when the delay grows there may be little or none left, and the
+    // aligned jump alone is then the smoothest join.
+    const avail = w - r
+    this.xLeft = avail >= this.xLen ? this.xLen : avail >= 32 ? avail : 0
+    this.xCur = this.xLeft
+    this.splices++
+  }
+  /** A splice may leave up to ALIGN frames of extra delay. Remove it as soon as the voice is silent at both the
+   *  current and the exact position (a gap between phrases), where the jump is inaudible. */
+  dropBiasIfSilent(n) {
+    const to = this.consumed - this.bias
+    if (to < 0 || to + n > this.written) return
+    const ring = this.ring
+    for (const start of [this.consumed, to]) {
+      for (let i = start; i < start + n; i++) {
+        const k = (i % RING) * 2
+        if (Math.abs(ring[k]) > 1e-4 || Math.abs(ring[k + 1]) > 1e-4) return
+      }
     }
-    if (pad + read < n) this.underrunFrames += n - pad - read
-    return read
+    this.consumed = to
+    this.bias = 0
+  }
+  /** Move everything SoundTouch has produced into the ring. */
+  pull() {
+    const fifo = this.fifo
+    while (fifo.frameCount > 0) {
+      const k = Math.min(fifo.frameCount, this.tmp.length / 2)
+      fifo.receiveSamples(this.tmp, k)
+      for (let i = 0; i < k; i++) {
+        const j = ((this.written + i) % RING) * 2
+        this.ring[j] = this.tmp[i * 2]
+        this.ring[j + 1] = this.tmp[i * 2 + 1]
+      }
+      this.written += k
+    }
+    // Safety: never fall so far behind that unread content would be overwritten.
+    if (this.written - this.consumed > RING - 4096) this.consumed = this.written - (RING - 4096)
   }
 }
 
@@ -139,6 +253,8 @@ class IvPitchProcessor extends AudioWorkletProcessor {
     this.mix = o.mix == null ? 1 : Math.max(0, Math.min(1, Number(o.mix)))
     this.subOffset = num(o.subOffset, 0)
     this.subGain = Math.max(0, Math.min(1, Number(o.subGain) || 0))
+    this.pendingOffset = null
+    if (o.crossfadeMs != null) XFADE_MS = Math.max(10, Math.min(20, num(o.crossfadeMs, 15)))
     this.schedule = o.schedule && o.schedule.length >= 2 ? Float32Array.from(o.schedule) : null
     this.scheduleIdx = 0
     this.alive = true
@@ -160,6 +276,9 @@ class IvPitchProcessor extends AudioWorkletProcessor {
       this.dryCap = Math.ceil(sampleRate) // up to 1 s of dry delay
       this.dry = [new Float32Array(this.dryCap), new Float32Array(this.dryCap)]
       this.dryPos = 0
+      this.dryDelayCur = null
+      this.dryXLeft = 0
+      this.dryFrom = 0
       this.inFrames = 0
       this.scratch = new Float32Array(256)
       this.outA = new Float32Array(256)
@@ -213,11 +332,18 @@ class IvPitchProcessor extends AudioWorkletProcessor {
       case 'setPitch':
         if (!this.failed) this.setPitch(d.value)
         break
-      case 'setSub':
-        this.subOffset = num(d.offset, 0)
+      case 'setSub': {
+        const offset = num(d.offset, 0)
         this.subGain = Math.max(0, Math.min(1, Number(d.gain) || 0))
+        // GRIM off: keep the lowered voice at its old pitch until its fade-out finishes, so the fade is clean.
+        if (this.subGain === 0 && (this.curSub || 0) > 0) this.pendingOffset = offset
+        else {
+          this.pendingOffset = null
+          this.subOffset = offset
+        }
         if (!this.failed) this.setPitch(this.pitch)
         break
+      }
       case 'setMix':
         this.mix = Math.max(0, Math.min(1, Number(d.value) || 0))
         if (!this.failed) this.setPitch(this.pitch)
@@ -245,6 +371,7 @@ class IvPitchProcessor extends AudioWorkletProcessor {
             subOffset: this.subOffset,
             subGain: this.subGain,
             underrunFrames: this.main.underrunFrames,
+            splices: this.main.splices + this.sub.splices,
           })
         break
       case 'dispose':
@@ -310,12 +437,29 @@ class IvPitchProcessor extends AudioWorkletProcessor {
       const started = this.inFrames >= this.main.target
       const a = this.outA
       const b = this.outB
-      // Ramp mix and sub gain over ~10 ms so control changes (GRIM on/off, correction amount) don't click.
-      const step = 1 / (0.01 * sampleRate)
+      // Ramp the correction mix and the GRIM Mix over XFADE_MS so control changes (GRIM on/off, GRIM Mix,
+      // correction amount) never switch abruptly. GRIM Mix is equal-power and wet replaces dry:
+      //   voice = dry·(1−mix) + main·mix            (correction path)
+      //   out   = voice·cos θ + sub·sin θ, cos θ = 1 − g  (g = GRIM Mix, 0–1 wet)
+      const step = 1 / ((XFADE_MS / 1000) * sampleRate)
       let mix = this.curMix == null ? this.mix : this.curMix
-      let g = this.curSub == null ? this.subGain : this.curSub
+      // GRIM Mix runs on an angle so the crossfade is a true equal-power sin/cos pair with finite slope at both ends:
+      // dry = cos θ = 1 − g, wet = sin θ. θ moves linearly to its target over XFADE_MS.
+      const thetaTarget = Math.acos(1 - this.subGain)
+      const thetaStep = (Math.PI / 2) * step
+      let th = this.curTheta == null ? thetaTarget : this.curTheta
       const cap = this.dryCap
+      // The dry path follows the main voice's delay so the correction blend stays aligned. When that delay changes
+      // (e.g. GRIM's bias or a big correction jump makes the main voice hold more), the dry read position moves too:
+      // crossfade old → new position over XFADE_MS (linear: both reads are the same signal) instead of jumping.
       const dryDelay = Math.min(cap - 1, this.alignedLatency())
+      if (this.dryDelayCur == null) this.dryDelayCur = dryDelay
+      if (dryDelay !== this.dryDelayCur && this.dryXLeft === 0) {
+        this.dryFrom = this.dryDelayCur
+        this.dryDelayCur = dryDelay
+        this.dryXLeft = this.main.xLen
+      }
+      const dlyNew = this.dryDelayCur
       const dl = this.dry[0]
       const dr = this.dry[1]
       let wetPeak = 0
@@ -323,22 +467,38 @@ class IvPitchProcessor extends AudioWorkletProcessor {
         const w = this.dryPos
         dl[w] = s[i * 2]
         dr[w] = s[i * 2 + 1]
-        let rp = w - dryDelay
+        let rp = w - dlyNew
         if (rp < 0) rp += cap
-        const dL = dl[rp]
-        const dR = dr[rp]
+        let dL = dl[rp]
+        let dR = dr[rp]
+        if (this.dryXLeft > 0) {
+          const t = 1 - this.dryXLeft / this.main.xLen
+          let ro = w - this.dryFrom
+          if (ro < 0) ro += cap
+          dL = dL * t + dl[ro] * (1 - t)
+          dR = dR * t + dr[ro] * (1 - t)
+          this.dryXLeft--
+        }
         this.dryPos = w + 1 === cap ? 0 : w + 1
         if (mix !== this.mix) mix = Math.abs(this.mix - mix) <= step ? this.mix : mix + (this.mix > mix ? step : -step)
-        if (g !== this.subGain) g = Math.abs(this.subGain - g) <= step ? this.subGain : g + (this.subGain > g ? step : -step)
+        if (th !== thetaTarget) th = Math.abs(thetaTarget - th) <= thetaStep ? thetaTarget : th + (thetaTarget > th ? thetaStep : -thetaStep)
         const aL = a[i * 2]
         const aR = a[i * 2 + 1]
         const m = (aL < 0 ? -aL : aL) + (aR < 0 ? -aR : aR)
         if (m > wetPeak) wetPeak = m
-        outL[i] = (dL * (1 - mix) + aL * mix) * (1 - g) + b[i * 2] * g
-        if (outR !== outL) outR[i] = (dR * (1 - mix) + aR * mix) * (1 - g) + b[i * 2 + 1] * g
+        const gd = Math.cos(th)
+        const gw = Math.sin(th)
+        outL[i] = (dL * (1 - mix) + aL * mix) * gd + b[i * 2] * gw
+        if (outR !== outL) outR[i] = (dR * (1 - mix) + aR * mix) * gd + b[i * 2 + 1] * gw
       }
       this.curMix = mix
-      this.curSub = g
+      this.curTheta = th
+      this.curSub = 1 - Math.cos(th)
+      if (th === 0 && this.pendingOffset != null) {
+        this.subOffset = this.pendingOffset
+        this.pendingOffset = null
+        this.setPitch(this.pitch)
+      }
       // Watchdog: 0.25 s of non-silent input with no wet output once running is a hard failure.
       if (started && this.inFrames > this.main.target * 2 && inPeak > 1e-3 && wetPeak < 1e-6) this.silentWet += n
       else if (wetPeak >= 1e-6) this.silentWet = 0

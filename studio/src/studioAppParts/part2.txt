@@ -19,7 +19,8 @@
 
   const saveCustom = async () => {
     const name = customName.trim() || `Custom ${presets.length + 1}`
-    const preset: Preset = { id: uid('preset'), name, settings: { ...settings } }
+    // GRIM Mix is stored explicitly so the preset keeps the blend even if it was following Depth.
+    const preset: Preset = { id: uid('preset'), name, settings: { ...settings, grimMix: grimMixOf(settings) } }
     await savePreset(preset)
     setPresets(await listPresets())
     setActivePresetId(preset.id)

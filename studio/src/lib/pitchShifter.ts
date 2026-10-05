@@ -17,6 +17,11 @@ export const PITCH_WORKLET_FILE = 'iv-pitch-processor.js'
 export const PITCH_PROCESSOR_NAME = 'iv-pitch-processor'
 export const PITCH_ERROR_EVENT = 'iv-pitch-error'
 export const FORCE_PITCH_FAIL_KEY = 'iv.forcePitchFail'
+/**
+ * Equal-power crossfade length (ms) the worklet uses for GRIM on/off, GRIM Mix changes and delay splices on large
+ * correction jumps. Passed to the worklet as processorOptions.crossfadeMs; must stay within 10–20 ms.
+ */
+export const GRIM_CROSSFADE_MS = 15
 
 export class PitchShiftError extends Error {
   constructor(message: string) {
@@ -77,7 +82,7 @@ export type RealtimeShifterOptions = {
   pitch?: number
   /** Wet/dry mix of the main voice (0–1). */
   mix?: number
-  /** Sub voice (GRIM drop): semitones relative to the main path, and its blend gain (0–1). */
+  /** Sub voice (GRIM drop): semitones relative to the main path, and GRIM Mix as 0–1 wet (equal-power, wet replaces dry). */
   subOffset?: number
   subGain?: number
   /** Deepest downward shift each voice allows (clamped beyond). Live latency adapts to the current shift. */
@@ -114,7 +119,7 @@ export class RealtimePitchShifter {
       channelCount: 2,
       channelCountMode: 'explicit',
       channelInterpretation: 'speakers',
-      processorOptions: { ...opts, pitch: opts.pitch ?? 0, mix: opts.mix ?? 1, forceFail: forcePitchFailRequested() },
+      processorOptions: { ...opts, pitch: opts.pitch ?? 0, mix: opts.mix ?? 1, crossfadeMs: GRIM_CROSSFADE_MS, forceFail: forcePitchFailRequested() },
     })
     const { latency, engine } = await waitForInit(node)
     return new RealtimePitchShifter(node, latency, engine)
@@ -142,7 +147,7 @@ export class RealtimePitchShifter {
     this.node.port.postMessage({ type: 'setVoiceHz', value: hz })
   }
 
-  /** GRIM sub voice: `offset` semitones below/above the main path, blended in with `gain` (0 turns it off). */
+  /** GRIM sub voice: `offset` semitones from the main path; `gain` = GRIM Mix, 0–1 wet (0 turns it off). Crossfaded over GRIM_CROSSFADE_MS. */
   setSub(offset: number, gain: number) {
     this.node.port.postMessage({ type: 'setSub', offset, gain: Math.max(0, Math.min(1, gain)) })
   }
@@ -208,6 +213,7 @@ export async function renderPitchSchedule(input: AudioBuffer, schedule: PitchPoi
       subMaxDown: 24,
       adaptive: false,
       tier: 'full',
+      crossfadeMs: GRIM_CROSSFADE_MS,
       forceFail: forcePitchFailRequested(),
     },
   })

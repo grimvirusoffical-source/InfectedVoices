@@ -1,5 +1,6 @@
 import * as Tone from 'tone'
 import {
+  GRIM_CROSSFADE_MS,
   PitchShiftError,
   RealtimePitchShifter,
   renderPitchSchedule,
@@ -7,7 +8,7 @@ import {
   stretchToDuration,
   type PitchPoint,
 } from './pitchShifter'
-import type { VocalSettings } from './presets'
+import { grimMixOf, type VocalSettings } from './presets'
 import { snapSemitones, yinDetect } from './pitchMath'
 
 export { pocketAssistOffsetSec, rapOnBeatRate } from './pocket'
@@ -27,6 +28,12 @@ export class InfectedAudioEngine {
   private deessFilter?: Tone.Filter
   private glitchDelay?: Tone.FeedbackDelay
   private grit?: Tone.Distortion
+  /** GRIM adds +0.1 grit. Instead of swapping the distortion curve (an instant waveshape change that clicks), a second
+   *  shaper carries the GRIM amount and the two are crossfaded over GRIM_CROSSFADE_MS when GRIM toggles. */
+  private gritGrim?: Tone.Distortion
+  private gritDryGain?: Tone.Gain
+  private gritGrimGain?: Tone.Gain
+  private gritAmounts: [number, number] = [-1, -1]
   private echo?: Tone.FeedbackDelay
   private space?: Tone.Reverb
   private compressor?: Tone.Compressor
@@ -79,6 +86,9 @@ export class InfectedAudioEngine {
     this.deessFilter = new Tone.Filter({ type: 'peaking', frequency: 7000, Q: 2.5, gain: 0 })
     this.glitchDelay = new Tone.FeedbackDelay({ delayTime: '16n', feedback: 0.35, wet: 0 })
     this.grit = new Tone.Distortion({ distortion: 0.05, oversample: '2x' })
+    this.gritGrim = new Tone.Distortion({ distortion: 0.15, oversample: '2x' })
+    this.gritDryGain = new Tone.Gain(1)
+    this.gritGrimGain = new Tone.Gain(0)
     this.echo = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.18, wet: 0.1 })
     this.space = new Tone.Reverb({ decay: 1.4, wet: 0.08 })
     await this.space.generate()
@@ -126,7 +136,11 @@ export class InfectedAudioEngine {
     this.warmthEq!.connect(this.deessFilter!)
     this.deessFilter!.connect(this.glitchDelay!)
     this.glitchDelay!.connect(this.grit!)
-    this.grit!.connect(this.compressor!)
+    this.glitchDelay!.connect(this.gritGrim!)
+    this.grit!.connect(this.gritDryGain!)
+    this.gritGrim!.connect(this.gritGrimGain!)
+    this.gritDryGain!.connect(this.compressor!)
+    this.gritGrimGain!.connect(this.compressor!)
     this.compressor!.connect(this.echo!)
     this.echo!.connect(this.space!)
     this.space!.connect(this.wetGain!)
@@ -224,7 +238,15 @@ export class InfectedAudioEngine {
     this.deessFilter!.gain.linearRampTo(-(s.deess / 100) * 12, 0.05)
     this.glitchDelay!.wet.rampTo(s.grimOn ? (s.glitch / 100) * 0.55 : (s.glitch / 100) * 0.2, 0.05)
     this.glitchDelay!.feedback.rampTo(0.15 + (s.glitch / 100) * 0.45, 0.05)
-    this.grit!.distortion = Math.min(0.85, (s.grit / 100) * 0.7 + (s.grimOn ? 0.1 : 0))
+    // Same signal through both shapers (correlated), so a linear crossfade keeps the level steady.
+    const gritBase = Math.min(0.85, (s.grit / 100) * 0.7)
+    const gritGrim = Math.min(0.85, gritBase + 0.1)
+    if (this.gritAmounts[0] !== gritBase) this.grit!.distortion = gritBase
+    if (this.gritAmounts[1] !== gritGrim) this.gritGrim!.distortion = gritGrim
+    this.gritAmounts = [gritBase, gritGrim]
+    const xf = GRIM_CROSSFADE_MS / 1000
+    this.gritDryGain!.gain.linearRampTo(s.grimOn ? 0 : 1, xf)
+    this.gritGrimGain!.gain.linearRampTo(s.grimOn ? 1 : 0, xf)
     this.echo!.wet.rampTo(s.echo / 100, 0.05)
     this.echo!.feedback.rampTo(0.05 + (s.echo / 100) * 0.35, 0.05)
     this.space!.wet.rampTo((s.space / 100) * (s.acapella ? 0.55 : 0.35), 0.08)
@@ -437,10 +459,12 @@ export function mainTargetSemitones(hz: number, s: VocalSettings): number {
   return snap + grimExtra * 0.35 + formantBias
 }
 
-/** GRIM sub voice: depth sets the drop below the main path, darkness sets how much of it is blended in. */
+/** GRIM sub voice: Depth sets the drop below the main path, GRIM Mix sets how much of it replaces the dry voice. */
 export function grimSubVoice(s: VocalSettings): { offset: number; gain: number } {
   if (!s.grimOn) return { offset: 0, gain: 0 }
-  return { offset: -(s.depth / 100) * 10 - 2, gain: 0.28 + (s.darkness / 100) * 0.25 }
+  // gain = GRIM Mix (0–1 wet). The worklet turns it into equal-power gains where the lowered voice replaces the
+  // dry/corrected voice (dry = 1 − wet), and crossfades every change over ~15 ms.
+  return { offset: -(s.depth / 100) * 10 - 2, gain: grimMixOf(s) / 100 }
 }
 
 function makeDistortionCurve(amount: number) {

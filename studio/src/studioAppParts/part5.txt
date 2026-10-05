@@ -9,6 +9,7 @@
               <h3>Tone (GRIM)</h3>
               <div className="knobs">
                 <Knob label="Depth (evil)" value={settings.depth} onChange={(v) => patchSettings({ depth: v })} />
+                <Knob label="GRIM Mix" testId="grim-mix" value={grimMixOf(settings)} onChange={(v) => patchSettings({ grimMix: v })} />
                 <Knob label="Glitch" value={settings.glitch} onChange={(v) => patchSettings({ glitch: v })} />
                 <Knob label="Grit" value={settings.grit} onChange={(v) => patchSettings({ grit: v })} />
                 <Knob label="Darkness" value={settings.darkness} onChange={(v) => patchSettings({ darkness: v })} />

@@ -12,6 +12,8 @@ export interface VocalSettings {
   glitch: number
   grit: number
   darkness: number
+  /** GRIM Mix, % wet (0 = dry voice only, 100 = only the lowered voice). null follows Depth (see defaultGrimMix). */
+  grimMix: number | null
   echo: number
   space: number
   gate: number
@@ -44,6 +46,7 @@ export const defaultSettings = (): VocalSettings => ({
   glitch: 0,
   grit: 8,
   darkness: 10,
+  grimMix: null,
   echo: 10,
   space: 8,
   gate: 25,
@@ -162,4 +165,29 @@ export const factoryPresets = (): Preset[] => [
 
 export function uid(prefix = 'id') {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+/**
+ * GRIM Mix default when the user hasn't set one: it follows Depth, so a light drop sits under the voice and a deep
+ * drop replaces it. Depth 50 lands mid-blend (50% wet), the deepest setting (Depth 100) is 88% wet / 12% dry.
+ */
+export function defaultGrimMix(depth: number): number {
+  const d = Math.max(0, Math.min(100, Number(depth) || 0))
+  return Math.round(d <= 50 ? 25 + d * 0.5 : 50 + (d - 50) * 0.76)
+}
+
+/** Effective GRIM Mix (% wet) for these settings: the saved value, or the Depth-linked default. */
+export function grimMixOf(s: Pick<VocalSettings, 'depth'> & { grimMix?: number | null }): number {
+  const v = s.grimMix
+  return v == null || !Number.isFinite(Number(v)) ? defaultGrimMix(s.depth) : Math.max(0, Math.min(100, Number(v)))
+}
+
+/**
+ * GRIM Mix gains (equal-power, wet replaces dry): dry = 1 − wet%, lowered voice = √(1 − dry²).
+ * Mirrors the worklet so tests can check the curve without an AudioContext.
+ */
+export function grimMixGains(wetPercent: number): { dry: number; wet: number } {
+  const w = Math.max(0, Math.min(1, wetPercent / 100))
+  const dry = 1 - w
+  return { dry, wet: Math.sqrt(Math.max(0, 1 - dry * dry)) }
 }
