@@ -14,7 +14,8 @@
     "open:android": "npm run sync:android && npx cap open android",
     "build:browser": "node scripts/build-browser.mjs",
     "start:redx": "bun scripts/redx-browser-server.mjs",
-    "test": "node --experimental-strip-types --test studio/src/lib/*.test.ts"
+    "test": "node --experimental-strip-types --test studio/src/lib/*.test.ts",
+    "test:engine": "node --test --test-concurrency=1 tests/e2e/engineStart.e2e.mjs"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.0",
@@ -35,7 +36,8 @@
   },
   "devDependencies": {
     "@capacitor/cli": "8.0.0",
-    "esbuild": "0.25.9"
+    "esbuild": "0.25.9",
+    "playwright-core": "1.63.0"
   },
   "redx": {
     "install_command": "npm install --include=dev --ignore-scripts",
