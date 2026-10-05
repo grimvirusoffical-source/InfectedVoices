@@ -41,8 +41,8 @@ export class InfectedAudioEngine {
   private metroLoop?: Tone.Loop
   private recorder?: Tone.Recorder
   private settings: VocalSettings
+  /** One pitch node: main voice = auto-tune correction (+ GRIM bias), sub voice = GRIM pitch drop. */
   private correct?: RealtimePitchShifter
-  private grimShift?: RealtimePitchShifter
   /** Last pitch-shifter failure; also broadcast as `iv-pitch-error` for the studio banner. */
   pitchError: string | null = null
   private analyser?: AnalyserNode
@@ -95,18 +95,14 @@ export class InfectedAudioEngine {
       envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 },
     })
 
-    // Bungee: detect→snap correction + optional GRIM dual low-shift.
+    // Pitch node: detect→snap correction on the main voice, GRIM drop on the sub voice (same node, one latency).
     // If the shifter can't start, the engine still runs (mic, record, metronome) with the chain
     // bypassed, and the failure is surfaced, never hidden.
     try {
-      this.correct = await RealtimePitchShifter.create(this.nativeCtx, { pitch: 0, speed: 1, mix: 0.85 })
-      this.grimShift = await RealtimePitchShifter.create(this.nativeCtx, { pitch: 0, speed: 1, mix: 0 })
+      this.correct = await RealtimePitchShifter.create(this.nativeCtx, { pitch: 0, mix: 0.85 })
       this.correct.onError((m) => this.setPitchError(m))
-      this.grimShift.onError((m) => this.setPitchError(m))
     } catch (e) {
-      this.correct?.dispose()
       this.correct = undefined
-      this.grimShift = undefined
       this.setPitchError(e instanceof Error ? e.message : String(e))
     }
 
@@ -114,15 +110,14 @@ export class InfectedAudioEngine {
     this.analyser.fftSize = 2048
     this.analyseBuf = new Float32Array(this.analyser.fftSize)
 
-    // Mic → gate → tap → Bungee correct → GRIM dual-shift → Tone FX
+    // Mic → gate → tap → pitch node (correction + GRIM drop) → Tone FX
     this.micGain.connect(this.gate)
     const tap = new Tone.Gain(1)
     this.gate.connect(tap)
     const fromNative = new Tone.Gain(1)
-    if (this.correct && this.grimShift) {
+    if (this.correct) {
       Tone.connect(tap, this.correct.node)
-      this.correct.node.connect(this.grimShift.node)
-      this.grimShift.node.connect(fromNative.input)
+      this.correct.node.connect(fromNative.input)
     } else {
       tap.connect(fromNative)
     }
@@ -188,16 +183,8 @@ export class InfectedAudioEngine {
     this.analyser.getFloatTimeDomainData(this.analyseBuf as unknown as Float32Array<ArrayBuffer>)
     const hz = yinDetect(this.analyseBuf, this.nativeCtx?.sampleRate ?? 48000)
     const s = this.settings
-    const humanCents = 5 + (s.humanize / 100) * 35
-    const snap = snapSemitones(hz, s.key, s.scale, humanCents)
-    if (snap == null) {
-      // unvoiced — ease toward 0 correction offset but keep GRIM depth
-      this.targetPitch = s.grimOn ? -(s.depth / 100) * 5 : 0
-    } else {
-      const grimExtra = s.grimOn ? -(s.depth / 100) * 7 : 0
-      const formantBias = (s.formant / 100) * 2
-      this.targetPitch = snap + grimExtra * 0.35 + formantBias
-    }
+    this.correct.setVoiceHz(hz)
+    this.targetPitch = mainTargetSemitones(hz, s)
     // slew by retuneMs
     const maxStep = 12 / Math.max(1, s.retuneMs / 16)
     const delta = this.targetPitch - this.currentPitch
@@ -205,15 +192,8 @@ export class InfectedAudioEngine {
     this.correct.setPitch(this.currentPitch)
     this.correct.setMix(Math.max(0, Math.min(1, Number.isFinite(s.correction) ? s.correction / 100 : 0)))
 
-    if (this.grimShift) {
-      if (s.grimOn) {
-        this.grimShift.setPitch(-(s.depth / 100) * 10 - 2)
-        this.grimShift.setMix(0.28 + (s.darkness / 100) * 0.25)
-      } else {
-        this.grimShift.setPitch(0)
-        this.grimShift.setMix(0)
-      }
-    }
+    const grim = grimSubVoice(s)
+    this.correct.setSub(grim.offset, grim.gain)
   }
 
   setOnTick(cb: (pos: number) => void) {
@@ -225,7 +205,6 @@ export class InfectedAudioEngine {
     this.metroLoop?.dispose()
     this.mic?.close()
     this.correct?.dispose()
-    this.grimShift?.dispose()
     Tone.getTransport().stop()
     Tone.getTransport().cancel()
   }
@@ -256,16 +235,6 @@ export class InfectedAudioEngine {
     this.masterOut!.gain.rampTo(outLin, 0.05)
     this.wetGain!.gain.rampTo(1, 0.05)
     if (this.correct) this.correct.setMix(Math.max(0, Math.min(1, Number.isFinite(s.correction) ? s.correction / 100 : 0)))
-  }
-
-  /** Rap-on-beat: Bungee time-stretch (pitch-preserving), not playbackRate */
-  setRapStretch(speed: number) {
-    const sp = Math.min(2, Math.max(0.5, speed))
-    this.correct?.setSpeed(sp)
-  }
-
-  resetRapStretch() {
-    this.correct?.setSpeed(1)
   }
 
   async startMic() {
@@ -317,7 +286,6 @@ export class InfectedAudioEngine {
     Tone.getTransport().position = 0
     this.beatPlayer?.unsync()
     this.beatPlayer?.stop()
-    this.resetRapStretch()
   }
 
   pause() {
@@ -366,20 +334,20 @@ export class InfectedAudioEngine {
     const frame = Math.floor(sr * 0.12) // ~120ms windows
     const hop = frame
     const mix = Math.max(0, Math.min(1, Number.isFinite(s.correction) ? s.correction / 100 : 0))
-    const grim = s.grimOn ? -(s.depth / 100) * 7 : 0
-    const formant = (s.formant / 100) * 2
+    const grim = grimSubVoice(s)
     const channels = audioBuffer.numberOfChannels
     let joined = audioBuffer
-    if (mix > 0) {
+    if (mix > 0 || grim.gain > 0) {
       // One schedule point per ~120 ms window; the worklet applies it at that exact frame.
+      // Same targets as the live path (mainTargetSemitones / grimSubVoice), so offline matches realtime.
       const schedule: PitchPoint[] = []
       for (let i = 0; i < ch0.length; i += hop) {
         const len = Math.min(frame, ch0.length - i)
-        const snap = len >= 256 ? snapSemitones(yinDetect(ch0.subarray(i, i + len), sr), s.key, s.scale, 8) : null
-        schedule.push({ atSec: i / sr, semitones: (snap ?? 0) + grim * 0.4 + formant })
+        const hz = len >= 256 ? yinDetect(ch0.subarray(i, i + len), sr) : -1
+        schedule.push({ atSec: i / sr, semitones: mainTargetSemitones(hz, s) })
       }
       try {
-        joined = await renderPitchSchedule(audioBuffer, schedule, mix)
+        joined = await renderPitchSchedule(audioBuffer, schedule, mix, { subOffset: grim.offset, subGain: grim.gain })
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
         this.setPitchError(message)
@@ -456,6 +424,23 @@ export class InfectedAudioEngine {
       throw e instanceof PitchShiftError ? e : new PitchShiftError(message)
     }
   }
+}
+
+/** Main-voice target: snap to the key/scale (humanize sets the deadband), plus the GRIM bias and formant offset. */
+export function mainTargetSemitones(hz: number, s: VocalSettings): number {
+  const humanCents = 5 + (s.humanize / 100) * 35
+  const snap = snapSemitones(hz, s.key, s.scale, humanCents)
+  // Unvoiced: no correction, but keep the GRIM depth.
+  if (snap == null) return s.grimOn ? -(s.depth / 100) * 5 : 0
+  const grimExtra = s.grimOn ? -(s.depth / 100) * 7 : 0
+  const formantBias = (s.formant / 100) * 2
+  return snap + grimExtra * 0.35 + formantBias
+}
+
+/** GRIM sub voice: depth sets the drop below the main path, darkness sets how much of it is blended in. */
+export function grimSubVoice(s: VocalSettings): { offset: number; gain: number } {
+  if (!s.grimOn) return { offset: 0, gain: 0 }
+  return { offset: -(s.depth / 100) * 10 - 2, gain: 0.28 + (s.darkness / 100) * 0.25 }
 }
 
 function makeDistortionCurve(amount: number) {

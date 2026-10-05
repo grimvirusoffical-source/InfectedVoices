@@ -35,12 +35,12 @@ test('offline processing preserves partial tails and dry takes; workers have cle
  const code=readFileSync(new URL('./audioEngine.ts',import.meta.url),'utf8')
  const shifter=readFileSync(new URL('./pitchShifter.ts',import.meta.url),'utf8')
  assert.equal(code.includes('if (len < 256) break'),false)
- // Dry takes (0% correction) skip the shifter entirely; short/partial windows stay in the schedule with no shift.
- assert.ok(code.includes('let joined = audioBuffer\n    if (mix > 0) {'))
- assert.ok(code.includes('const snap = len >= 256 ? snapSemitones('))
+ // Dry takes (0% correction, GRIM off) skip the shifter entirely; short/partial windows stay in the schedule with no shift.
+ assert.ok(code.includes('let joined = audioBuffer\n    if (mix > 0 || grim.gain > 0) {'))
+ assert.ok(code.includes('const hz = len >= 256 ? yinDetect(ch0.subarray(i, i + len), sr) : -1'))
  // The offline render keeps the full input length (latency trimmed, tail preserved).
  assert.ok(shifter.includes('new AudioBuffer({ length: input.length, numberOfChannels: channels, sampleRate: sr })'))
- // No Web Worker path: bungee-pitch-shift's worker always throws (no OfflineAudioContext in workers).
+ // No Web Worker path: offline renders run on the main thread (no OfflineAudioContext in workers).
  assert.equal(code.includes('OfflineProcessor'),false)
  assert.ok(code.includes('finally { URL.revokeObjectURL(url) }'))
 })

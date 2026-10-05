@@ -46,7 +46,7 @@ import {
   isFeatureLocked,
 } from './lib/gates'
 import { useEntitlements } from './hooks/useEntitlements'
-import { ExportBitDepth, FeatureLock, PasswordHint, SubscribePanel } from './components'
+import { AboutLicenses, ExportBitDepth, FeatureLock, PasswordHint, SubscribePanel } from './components'
 import { formatDeliveryNote } from './lib/delivery'
 import { QRCodeSVG } from 'qrcode.react'
 import { shiftAudioBuffer } from './lib/audioShift'
@@ -67,6 +67,7 @@ type Tab =
   | 'mobile'
   | 'desktop'
   | 'updates'
+  | 'about'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'studio', label: 'Studio' },
@@ -80,6 +81,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'mobile', label: 'Mobile Connect' },
   { id: 'desktop', label: 'Windows' },
   { id: 'updates', label: 'Updates' },
+  { id: 'about', label: 'About' },
 ]
 
 const MASTER_DEFAULT: MicMasterOptions = {

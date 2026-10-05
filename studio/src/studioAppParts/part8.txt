@@ -50,6 +50,8 @@
             </button>
           </section>
         )}
+
+        {tab === 'about' && <AboutLicenses />}
       </main>
     </div>
   )

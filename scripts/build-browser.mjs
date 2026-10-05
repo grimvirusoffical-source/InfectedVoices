@@ -89,9 +89,11 @@ execFileSync(process.execPath,[path.join(studioDir,'scripts','copy-worklets.mjs'
 execFileSync(process.execPath,[npmCli,'run','build:host','--prefix',studioDir],{cwd:root,stdio:'inherit'});
 await fs.copyFile(path.join(studioOut,'index.html'),path.join(out,'index.html'));
 await fs.cp(path.join(studioOut,'assets'),path.join(out,'assets'),{recursive:true});
-for(const file of ['favicon.svg','bungee-processor-bundled.js','iv-bungee-processor.js','audio-processor.worker.bundle.js','manifest.webmanifest']){
+for(const file of ['favicon.svg','iv-pitch-processor.js','manifest.webmanifest']){
   await fs.copyFile(path.join(studioOut,file),path.join(out,file));
 }
+// SoundTouch (LGPL-2.1) stays a separate, unmodified file with its license next to it.
+await fs.cp(path.join(studioOut,'vendor'),path.join(out,'vendor'),{recursive:true});
 const apiText=await fs.readFile(path.join(out,'api.js'),'utf8');
 if(!apiText.includes('infectednation_session')||!apiText.includes('emailLogin')||!apiText.includes('iv-auth-request'))throw Error('Browser account adapter was overwritten.');
 const choicesText=await fs.readFile(path.join(out,'auth-choices.js'),'utf8');
@@ -99,7 +101,7 @@ if(!choicesText.includes('Apple signup')||!studio.includes('auth-choices.js')||!
 const indexText=await fs.readFile(path.join(out,'index.html'),'utf8');
 if(!indexText.includes('content="0.7.0"'))throw Error('Canonical studio was not copied into browser-dist.');
 
-for(const required of ['index.html','studio.html','api.js','workstation/app.js','lab/index.html','lab/account-entry.js','favicon.svg','manifest.webmanifest','iv-bungee-processor.js']){
+for(const required of ['index.html','studio.html','api.js','workstation/app.js','lab/index.html','lab/account-entry.js','favicon.svg','manifest.webmanifest','iv-pitch-processor.js','vendor/soundtouchjs/soundtouch.js','vendor/soundtouchjs/LICENSE.txt','vendor/soundtouchjs/SOURCE.txt']){
   await fs.access(path.join(out,required));
 }
 const downloadPage=path.join(root,'download','index.html');

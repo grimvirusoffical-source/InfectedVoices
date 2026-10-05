@@ -1,17 +1,20 @@
 /**
- * Pitch shifting for the live engine and offline renders.
+ * Pitch shifting for the live engine and offline renders. The engine-neutral contract is:
+ *   - worklet file `iv-pitch-processor.js`, registered as processor `iv-pitch-processor`
+ *   - messages: setPitch / setSub / setMix / forceFail / ackError / dispose
+ *   - an `initialized` message that carries `latency` (frames), or an `error` message
+ * The current implementation (studio/public/iv-pitch-processor.js) uses SoundTouch (soundtouchjs, LGPL-2.1),
+ * loaded at runtime as its own unmodified file. To swap engines, replace that worklet while keeping the contract.
  *
- * All shifting goes through `public/iv-bungee-processor.js` (built by scripts/build-bungee-worklet.mjs).
- * It is loaded as an ES-module AudioWorklet on a *native* (Offline)AudioContext.
- * Offline work runs on the main thread with OfflineAudioContext. bungee-pitch-shift's OfflineProcessor
- * worker always throws because OfflineAudioContext doesn't exist in Web Workers.
+ * The worklet runs on the *native* AudioContext for live audio, and on an OfflineAudioContext on the main thread
+ * for offline renders (OfflineAudioContext doesn't exist in Web Workers).
  *
  * There's no silent pass-through. Every failure becomes a PitchShiftError and is broadcast as
  * `iv-pitch-error`, and the studio shows it in the `pitch-error` banner.
  */
 
-export const PITCH_WORKLET_FILE = 'iv-bungee-processor.js'
-export const PITCH_PROCESSOR_NAME = 'iv-bungee-processor'
+export const PITCH_WORKLET_FILE = 'iv-pitch-processor.js'
+export const PITCH_PROCESSOR_NAME = 'iv-pitch-processor'
 export const PITCH_ERROR_EVENT = 'iv-pitch-error'
 export const FORCE_PITCH_FAIL_KEY = 'iv.forcePitchFail'
 
@@ -52,15 +55,15 @@ async function ensureWorklet(ctx: BaseAudioContext) {
   loadedContexts.add(ctx)
 }
 
-type WorkletMessage = { type: string; message?: string; latency?: number }
+type WorkletMessage = { type: string; message?: string; latency?: number; engine?: string }
 
-function waitForInit(node: AudioWorkletNode, timeoutMs = 8000): Promise<{ latency: number }> {
+function waitForInit(node: AudioWorkletNode, timeoutMs = 8000): Promise<{ latency: number; engine: string }> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new PitchShiftError('Pitch shifter did not initialise in time')), timeoutMs)
     node.port.onmessage = (e: MessageEvent<WorkletMessage>) => {
       if (e.data?.type === 'initialized') {
         clearTimeout(timer)
-        resolve({ latency: Number(e.data.latency) || 0 })
+        resolve({ latency: Number(e.data.latency) || 0, engine: String(e.data.engine || '') })
       } else if (e.data?.type === 'error') {
         clearTimeout(timer)
         reject(new PitchShiftError(e.data.message || 'Pitch shifter failed'))
@@ -69,18 +72,34 @@ function waitForInit(node: AudioWorkletNode, timeoutMs = 8000): Promise<{ latenc
   })
 }
 
-export type RealtimeShifterOptions = { pitch?: number; speed?: number; mix?: number }
+export type RealtimeShifterOptions = {
+  /** Main voice shift in semitones. */
+  pitch?: number
+  /** Wet/dry mix of the main voice (0–1). */
+  mix?: number
+  /** Sub voice (GRIM drop): semitones relative to the main path, and its blend gain (0–1). */
+  subOffset?: number
+  subGain?: number
+  /** Deepest downward shift each voice allows (clamped beyond). Live latency adapts to the current shift. */
+  mainMaxDown?: number
+  subMaxDown?: number
+  /** WSOLA tier: 'auto' (live default: fast tier for voices above ~165 Hz) or 'full'. */
+  tier?: 'auto' | 'full'
+}
 
-/** Live AudioWorklet shifter. `create` resolves only when the WASM is running, and rejects otherwise. */
+/** Live AudioWorklet shifter. `create` resolves only when the engine is running, and rejects otherwise. */
 export class RealtimePitchShifter {
   readonly node: AudioWorkletNode
+  /** Frames between input and aligned output (also the dry-path delay). */
   readonly latency: number
+  readonly engine: string
   error: string | null = null
   private listeners = new Set<(message: string) => void>()
 
-  private constructor(node: AudioWorkletNode, latency: number) {
+  private constructor(node: AudioWorkletNode, latency: number, engine: string) {
     this.node = node
     this.latency = latency
+    this.engine = engine
     node.port.onmessage = (e: MessageEvent<WorkletMessage>) => {
       if (e.data?.type === 'error') this.raise(e.data.message || 'Pitch shifter failed')
     }
@@ -95,10 +114,10 @@ export class RealtimePitchShifter {
       channelCount: 2,
       channelCountMode: 'explicit',
       channelInterpretation: 'speakers',
-      processorOptions: { pitch: opts.pitch ?? 0, speed: opts.speed ?? 1, mix: opts.mix ?? 1, forceFail: forcePitchFailRequested() },
+      processorOptions: { ...opts, pitch: opts.pitch ?? 0, mix: opts.mix ?? 1, forceFail: forcePitchFailRequested() },
     })
-    const { latency } = await waitForInit(node)
-    return new RealtimePitchShifter(node, latency)
+    const { latency, engine } = await waitForInit(node)
+    return new RealtimePitchShifter(node, latency, engine)
   }
 
   private raise(message: string) {
@@ -118,8 +137,14 @@ export class RealtimePitchShifter {
     this.node.port.postMessage({ type: 'setPitch', value: semitones })
   }
 
-  setSpeed(speed: number) {
-    this.node.port.postMessage({ type: 'setSpeed', value: speed })
+  /** Pitch-tracker reading (Hz, or ≤0 when unvoiced). Lets the worklet use its lower-latency tier for higher voices. */
+  setVoiceHz(hz: number) {
+    this.node.port.postMessage({ type: 'setVoiceHz', value: hz })
+  }
+
+  /** GRIM sub voice: `offset` semitones below/above the main path, blended in with `gain` (0 turns it off). */
+  setSub(offset: number, gain: number) {
+    this.node.port.postMessage({ type: 'setSub', offset, gain: Math.max(0, Math.min(1, gain)) })
   }
 
   setMix(mix: number) {
@@ -151,7 +176,9 @@ function rms(data: Float32Array, from = 0, to = data.length) {
  * Offline pitch render on the main thread. The pitch schedule runs sample-accurately inside the
  * worklet from `currentFrame`, and the output is trimmed by the shifter latency so it lines up with the input.
  */
-export async function renderPitchSchedule(input: AudioBuffer, schedule: PitchPoint[], mix = 1): Promise<AudioBuffer> {
+export type OfflineRenderOptions = { subOffset?: number; subGain?: number }
+
+export async function renderPitchSchedule(input: AudioBuffer, schedule: PitchPoint[], mix = 1, opts: OfflineRenderOptions = {}): Promise<AudioBuffer> {
   const sr = input.sampleRate
   const pad = Math.ceil(sr * 0.25)
   const ctx = new OfflineAudioContext(2, input.length + pad, sr)
@@ -170,7 +197,19 @@ export async function renderPitchSchedule(input: AudioBuffer, schedule: PitchPoi
     channelCount: 2,
     channelCountMode: 'explicit',
     channelInterpretation: 'speakers',
-    processorOptions: { mix, schedule: flat, pitch: schedule[0]?.semitones ?? 0, forceFail: forcePitchFailRequested() },
+    // Offline latency doesn't matter (it's trimmed), so allow the full ±24 st range.
+    processorOptions: {
+      mix,
+      schedule: flat,
+      pitch: schedule[0]?.semitones ?? 0,
+      subOffset: opts.subOffset ?? 0,
+      subGain: opts.subGain ?? 0,
+      mainMaxDown: 24,
+      subMaxDown: 24,
+      adaptive: false,
+      tier: 'full',
+      forceFail: forcePitchFailRequested(),
+    },
   })
   const { latency } = await waitForInit(node)
   let renderError: string | null = null

@@ -5,20 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ../scripts/assemble-studio-app.mjs && node scripts/build-bungee-worklet.mjs && tsc -b && vite build",
-    "build:host": "node ../scripts/assemble-studio-app.mjs && node scripts/build-bungee-worklet.mjs && tsc -b && vite build --outDir ../.browser-studio --emptyOutDir",
-    "build:cap": "node ../scripts/assemble-studio-app.mjs && node scripts/build-bungee-worklet.mjs && tsc -b && vite build --outDir ../.vocal-lab --emptyOutDir",
+    "build": "node ../scripts/assemble-studio-app.mjs && node scripts/copy-worklets.mjs && tsc -b && vite build",
+    "build:host": "node ../scripts/assemble-studio-app.mjs && node scripts/copy-worklets.mjs && tsc -b && vite build --outDir ../.browser-studio --emptyOutDir",
+    "build:cap": "node ../scripts/assemble-studio-app.mjs && node scripts/copy-worklets.mjs && tsc -b && vite build --outDir ../.vocal-lab --emptyOutDir",
     "lint": "oxlint",
     "preview": "vite preview",
     "postinstall": "node scripts/copy-worklets.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
-    "bungee-pitch-shift": "^1.0.8",
     "idb": "^8.0.3",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "soundtouchjs": "0.3.0",
     "tone": "^15.1.22"
   },
   "devDependencies": {
