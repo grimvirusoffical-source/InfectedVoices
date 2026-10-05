@@ -89,7 +89,7 @@ execFileSync(process.execPath,[path.join(studioDir,'scripts','copy-worklets.mjs'
 execFileSync(process.execPath,[npmCli,'run','build:host','--prefix',studioDir],{cwd:root,stdio:'inherit'});
 await fs.copyFile(path.join(studioOut,'index.html'),path.join(out,'index.html'));
 await fs.cp(path.join(studioOut,'assets'),path.join(out,'assets'),{recursive:true});
-for(const file of ['favicon.svg','bungee-processor-bundled.js','audio-processor.worker.bundle.js','manifest.webmanifest']){
+for(const file of ['favicon.svg','bungee-processor-bundled.js','iv-bungee-processor.js','audio-processor.worker.bundle.js','manifest.webmanifest']){
   await fs.copyFile(path.join(studioOut,file),path.join(out,file));
 }
 const apiText=await fs.readFile(path.join(out,'api.js'),'utf8');
@@ -99,7 +99,7 @@ if(!choicesText.includes('Apple signup')||!studio.includes('auth-choices.js')||!
 const indexText=await fs.readFile(path.join(out,'index.html'),'utf8');
 if(!indexText.includes('content="0.7.0"'))throw Error('Canonical studio was not copied into browser-dist.');
 
-for(const required of ['index.html','studio.html','api.js','workstation/app.js','lab/index.html','lab/account-entry.js','favicon.svg','manifest.webmanifest']){
+for(const required of ['index.html','studio.html','api.js','workstation/app.js','lab/index.html','lab/account-entry.js','favicon.svg','manifest.webmanifest','iv-bungee-processor.js']){
   await fs.access(path.join(out,required));
 }
 const downloadPage=path.join(root,'download','index.html');

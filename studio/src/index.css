@@ -265,6 +265,15 @@ code {
   background: var(--accent);
   flex-shrink: 0;
 }
+.status.pitch-error {
+  margin-top: 8px;
+  border-color: #dc2626;
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.12);
+}
+.status.pitch-error::before {
+  background: #dc2626;
+}
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
