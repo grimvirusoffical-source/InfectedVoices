@@ -70,7 +70,14 @@
     }
     const buf = await blobToAudioBuffer(file)
     vocalBufRef.current = buf
-    const processed = await engineRef.current.processOfflineBuffer(buf)
+    let processed: AudioBuffer
+    try {
+      setStatus(`Tuning ${file.name} offline…`)
+      processed = await engineRef.current.processOfflineBuffer(buf)
+    } catch (e) {
+      setStatus(`Offline tune failed: ${e instanceof Error ? e.message : String(e)}`)
+      return
+    }
     const wav = (await exportMasterWav(processed, exportTier)).blob
     stageBounce(`Tune preview is ready for ${file.name}. Preview, then Keep. Cancel leaves the original file out of the project.`, wav, async () => {
       await saveTake({ name: `Offline ${file.name}`, blob: wav, kind: 'infected' })

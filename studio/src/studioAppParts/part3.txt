@@ -58,7 +58,13 @@
     const buf = await blobToAudioBuffer(pass.blob)
     const speed = rapOnBeatRate(buf.duration, target)
     setRapRate(speed)
-    const stretched = await engineRef.current.stretchBufferToDuration(buf, target)
+    let stretched: AudioBuffer
+    try {
+      stretched = await engineRef.current.stretchBufferToDuration(buf, target)
+    } catch (e) {
+      setStatus(`Rap on Beat failed: ${e instanceof Error ? e.message : String(e)}`)
+      return
+    }
     const wav = (await exportMasterWav(stretched, exportTier)).blob
     stageBounce(`Timing preview is ready. Pass stretched to ${target.toFixed(2)} s with pitch kept. Preview, then Keep.`, wav, async () => {
       await saveTake({
@@ -177,6 +183,11 @@
           </div>
         </div>
         <div className="status">{status}</div>
+        {pitchError && (
+          <div className="status pitch-error" role="alert" data-testid="pitch-error">
+            Pitch shifting failed: {pitchError}. Auto-tune, the GRIM pitch drop and Rap on Beat are not being applied.
+          </div>
+        )}
         <p className="meter-readout" aria-live="polite">{trackPeak}. Aim lead peaks around −12 to −6 dBFS. Master sample peak and the delivery note print after a bounce.</p>
         {staged && (
           <div className="keep-bar" id="ivKeepBar">

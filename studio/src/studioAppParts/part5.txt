@@ -93,13 +93,13 @@
                 onClick={() => {
                   const next = !loopOn
                   setLoopOn(next)
-                  engineRef.current?.setLoop(next, loopStart, loopEnd)
-                  applyLoop()
+                  // Use the new value: `loopOn` is still the pre-toggle state inside this handler.
+                  applyLoop(next)
                 }}
               >
                 {loopOn ? 'Loop ON' : 'Loop OFF'}
               </button>
-              <button onClick={applyLoop}>Apply loop points</button>
+              <button onClick={() => applyLoop()}>Apply loop points</button>
               <button onClick={setOneBarLoop}>One-bar loop at cursor</button>
               <button onClick={() => toggleMetro(!metro)}>Metronome cue</button>
               <button className={recording ? 'rec-live' : 'primary'} onClick={savePracticePass}>
