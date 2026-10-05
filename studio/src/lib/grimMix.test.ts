@@ -67,6 +67,7 @@ const stUrl = stCandidates.find((u) => existsSync(u))
 const SR = 48000
 type Proc = { process: (i: Float32Array[][], o: Float32Array[][]) => boolean; port: { onmessage: (e: { data: unknown }) => void } }
 async function loadWorklet(): Promise<new (o: { processorOptions: Record<string, unknown> }) => Proc> {
+  assert.ok(stUrl, 'soundtouchjs not installed (run npm ci --prefix studio or a build first)')
   const g = globalThis as Record<string, unknown>
   g.sampleRate = SR
   g.currentFrame = 0
@@ -122,7 +123,10 @@ function noClickOrGap(x: Float32Array, label: string, at: number[], steady: [num
   }
 }
 
-test('worklet: GRIM on/off, GRIM Mix changes and large correction jumps crossfade without clicks or gaps', { skip: stUrl ? false : 'soundtouchjs not installed (run npm ci --prefix studio or a build first)' }, async () => {
+// Locally: skip when SoundTouch isn't installed. In CI: never skip — missing SoundTouch fails the job.
+const skipWorkletDsp = stUrl || process.env.CI ? false : 'soundtouchjs not installed (run npm ci --prefix studio or a build first)'
+
+test('worklet: GRIM on/off, GRIM Mix changes and large correction jumps crossfade without clicks or gaps', { skip: skipWorkletDsp }, async () => {
   const P = await loadWorklet()
   const toggle = render(P, { mix: 0 }, [{ at: 1, msg: { type: 'setSub', offset: -12, gain: 0.88 } }, { at: 2, msg: { type: 'setSub', offset: 0, gain: 0 } }])
   noClickOrGap(toggle, 'GRIM toggle', [1, 2], [[0.5, 0.95], [1.4, 1.95], [2.4, 2.95]])
@@ -140,7 +144,7 @@ test('worklet: GRIM on/off, GRIM Mix changes and large correction jumps crossfad
   noClickOrGap(jump, 'correction jump', [1, 2], [[0.5, 0.95], [1.6, 1.95], [2.6, 2.95]])
 })
 
-test('worklet: at 100% GRIM Mix the lowered voice replaces the dry voice', { skip: stUrl ? false : 'soundtouchjs not installed' }, async () => {
+test('worklet: at 100% GRIM Mix the lowered voice replaces the dry voice', { skip: skipWorkletDsp === false ? false : 'soundtouchjs not installed' }, async () => {
   const P = await loadWorklet()
   const goertzel = (x: Float32Array, hz: number) => {
     const a = SR, b = SR * 2
